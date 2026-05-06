@@ -17,3 +17,4 @@ data/synthetic/**/*.csv
 CLAUDE.md
 docs/context/
 test_pipeline_headless.py
+test_pipeline_headless.py
