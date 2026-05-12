@@ -25,7 +25,10 @@ Rules:
 1. Every jtbd must follow exactly: "When I [situation], I want to [motivation], so I can [outcome]."
 2. CRITICAL: Every opportunity must have between 2 and 3 solutions. Never return fewer than 2 solutions per opportunity.
 3. 1-2 assumptions per solution. Must be falsifiable.
-4. Risk: exactly "low", "medium", or "high".
+4. Risk must be exactly "low", "medium", or "high" using this rubric:
+   - high   = depends on unvalidated user behaviour or technical feasibility with no evidence in the data
+   - medium = partially supported by the discovery data but not yet confirmed
+   - low    = directly evidenced by multiple chunks in this cluster
 5. Do not generate priority_score, importance, satisfaction, or opportunity_score. These are computed externally and injected after parsing.
 6. Do not invent data. Base every opportunity on the quotes provided.
 7. CRITICAL: You must return EXACTLY one opportunity per cluster. Count the clusters in the input. Return that exact number of opportunities — no more, no less. If you receive 3 clusters, return 3 opportunities. If you receive 5 clusters, return 5 opportunities. Never merge clusters. Never split clusters. The cluster_id in each opportunity must match the cluster_id from the input.

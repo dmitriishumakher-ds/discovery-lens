@@ -48,7 +48,7 @@ user_message = f"Goal: {goal}\n\nClusters:\n{json.dumps(clusters, indent=2)}"
 client = Groq(api_key=os.environ["GROQ_API_KEY"])
 
 response = client.chat.completions.create(
-    model="llama-3.1-8b-instant",
+    model="llama-3.3-70b-versatile",
     messages=[
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": user_message}
@@ -113,3 +113,24 @@ for o in opps:
         print(f"✅ Solution count OK for cluster {o['cluster_id']}: {n}")
     else:
         print(f"❌ Solution count FAIL for cluster {o['cluster_id']}: {n}")
+
+# Check 6: risk distribution is not uniform
+# Before the rubric was added, the model tended to guess — often producing all
+# "medium" or a single repeated value. A non-uniform distribution shows the
+# rubric is doing its job: different assumptions get different risk labels based
+# on how well the data supports them.
+all_risks = [
+    a.get("risk")
+    for o in opps
+    for s in o.get("solutions", [])
+    for a in s.get("assumptions", [])
+]
+unique_risks = set(all_risks)
+print(f"\n=== RISK DISTRIBUTION ===")
+for level in ["low", "medium", "high"]:
+    count = all_risks.count(level)
+    print(f"  {level:6s}: {count}")
+if len(unique_risks) > 1:
+    print(f"✅ Risk distribution is non-uniform ({len(unique_risks)} distinct values used)")
+else:
+    print(f"❌ Risk distribution is uniform — all assumptions labelled '{all_risks[0] if all_risks else 'none'}' (rubric may not be working)")
