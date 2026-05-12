@@ -31,10 +31,19 @@ from typing import Any
 _vader = SentimentIntensityAnalyzer()
 
 # Weights — defined as constants so they are easy to tune and review
-_DIVERSITY_WEIGHT = 0.65       # evidence_robustness: source_type_diversity component
-_SIZE_WEIGHT = 0.35            # evidence_robustness: normalised cluster size component
-_ODI_WEIGHT = 0.60             # priority_score: ODI component
-_EVIDENCE_WEIGHT = 0.40        # priority_score: evidence robustness component
+_DIVERSITY_WEIGHT = 0.65  # evidence_robustness: source_type_diversity component
+_SIZE_WEIGHT = 0.35  # evidence_robustness: normalised cluster size component
+_ODI_WEIGHT = 0.60  # priority_score: ODI component
+_EVIDENCE_WEIGHT = 0.40  # priority_score: evidence robustness component
+
+# Source-type enum recognised by the system.
+# Kept in sync with the source_type contract in chunker.py / extractor.py.
+# Used as a FIXED denominator for source_type_diversity so the metric is:
+#   - stable across sessions (does not shrink when the user uploads fewer source types)
+#   - honest when only one source type is present (will not collapse to 1.0)
+#   - comparable across runs and PMs
+KNOWN_SOURCE_TYPES: tuple[str, ...] = ("interview", "review", "ticket", "usability")
+KNOWN_SOURCE_TYPES_COUNT: int = len(KNOWN_SOURCE_TYPES)
 
 
 def score_clusters(
@@ -73,10 +82,6 @@ def score_clusters(
     chunk_source: dict[str, str] = {c["chunk_id"]: c["source_type"] for c in chunks}
 
     total_chunks: int = len(chunks)
-
-    # Total unique source types across ALL chunks — used to normalise diversity
-    all_source_types: set[str] = {c["source_type"] for c in chunks}
-    total_source_types: int = len(all_source_types)
 
     scored: list[dict[str, Any]] = []
 
@@ -121,28 +126,24 @@ def score_clusters(
         }
         unique_in_cluster: int = len(cluster_source_types)
 
-        # Normalise: proportion of all available source types represented
-        source_type_diversity: float = (
-            unique_in_cluster / total_source_types
-            if total_source_types > 0
-            else 0.0
-        )
+        # Normalise against the FIXED count of source types the system recognises,
+        # not against the unique types present in the current upload.
+        # See KNOWN_SOURCE_TYPES_COUNT at the top of this module for why.
+        source_type_diversity: float = unique_in_cluster / KNOWN_SOURCE_TYPES_COUNT
 
         # Normalised size is the same value as importance — explicit for clarity
         normalised_size: float = importance
 
-        evidence_robustness: float = (
-            (source_type_diversity * _DIVERSITY_WEIGHT)
-            + (normalised_size * _SIZE_WEIGHT)
+        evidence_robustness: float = (source_type_diversity * _DIVERSITY_WEIGHT) + (
+            normalised_size * _SIZE_WEIGHT
         )
 
         # ------------------------------------------------------------------ #
         # PRIORITY SCORE                                                       #
         # ------------------------------------------------------------------ #
 
-        priority_score: float = (
-            (odi_score * _ODI_WEIGHT)
-            + (evidence_robustness * _EVIDENCE_WEIGHT)
+        priority_score: float = (odi_score * _ODI_WEIGHT) + (
+            evidence_robustness * _EVIDENCE_WEIGHT
         )
 
         scored.append(
