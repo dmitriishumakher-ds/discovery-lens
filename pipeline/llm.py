@@ -14,8 +14,9 @@ Score fields injected post-parse from scored_clusters (never LLM-generated):
 
 import json
 import os
+import re
 from pathlib import Path
-from groq import Groq
+from groq import Groq, APIStatusError
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -86,14 +87,15 @@ def _call_groq(client: Groq, model: str, system: str, user: str) -> str:
 def _parse_json(raw: str) -> dict:
     """
     Parse JSON from LLM response.
-    Strips accidental markdown fences if the model ignored the instruction.
+    Strips accidental markdown fences and trailing commas before parsing.
     Raises json.JSONDecodeError on failure so the caller can retry.
     """
     cleaned = raw.strip()
     if cleaned.startswith("```"):
-        # Strip ```json ... ``` fences
         lines = cleaned.splitlines()
         cleaned = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
+    # Remove trailing commas before ] or } — LLMs occasionally emit these
+    cleaned = re.sub(r",\s*([}\]])", r"\1", cleaned)
     return json.loads(cleaned)
 
 
@@ -144,11 +146,11 @@ def build_ost(
     user = _build_user_message(clusters, goal)
 
     # --- Primary model attempt ---
-    raw = _call_groq(client, _PRIMARY_MODEL, system, user)
     try:
+        raw = _call_groq(client, _PRIMARY_MODEL, system, user)
         ost = _parse_json(raw)
-    except json.JSONDecodeError:
-        # --- Fallback model attempt ---
+    except (json.JSONDecodeError, APIStatusError):
+        # Fall back on bad JSON or API errors (e.g. 413 token-limit on free tier)
         raw = _call_groq(client, _FALLBACK_MODEL, system, user)
         try:
             ost = _parse_json(raw)

@@ -23,25 +23,30 @@ def score_clusters(
     chunks: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     """
-    Score each cluster using importance and satisfaction proxies.
+    Score each cluster with three independent signals per the Apr 29 redesign.
 
-    importance    = cluster_size / total_chunks
-    satisfaction  = (avg_vader_compound + 1) / 2   # normalised to 0–1
-    opportunity   = importance * (1 - satisfaction)
+    importance            = cluster_size / total_chunks
+    satisfaction          = (avg_vader_compound + 1) / 2
+    source_type_diversity = unique source types in cluster / total unique source types
+    odi_score             = importance * (1 - satisfaction)
+    evidence_robustness   = (source_type_diversity * 0.65) + (importance * 0.35)
+    priority_score        = (odi_score * 0.60) + (evidence_robustness * 0.40)
 
     Args:
         clusters: output of clusterer.py
         chunks:   output of chunker.py
 
     Returns:
-        list of scored cluster dicts, same order as input clusters
+        list of scored cluster dicts sorted by priority_score descending
     """
-    # Build a lookup from chunk_id → text for fast access
-    chunk_text: dict[str, str] = {c["chunk_id"]: c["text"] for c in chunks}
+    chunk_text_map: dict[str, str] = {c["chunk_id"]: c["text"] for c in chunks}
+    chunk_source_map: dict[str, str] = {c["chunk_id"]: c["source_type"] for c in chunks}
     total_chunks: int = len(chunks)
 
     if total_chunks == 0:
         raise ValueError("chunks list is empty — cannot compute importance scores")
+
+    total_source_types: int = len({c["source_type"] for c in chunks})
 
     scored: list[dict[str, Any]] = []
 
@@ -56,21 +61,28 @@ def score_clusters(
         # --- Sentiment (VADER compound per chunk, then average) ---
         compound_scores: list[float] = []
         for cid in chunk_ids:
-            text = chunk_text.get(cid)
+            text = chunk_text_map.get(cid)
             if text:
-                score = _vader.polarity_scores(text)["compound"]
-                compound_scores.append(score)
+                compound_scores.append(_vader.polarity_scores(text)["compound"])
 
-        if compound_scores:
-            avg_sentiment: float = sum(compound_scores) / len(compound_scores)
-        else:
-            avg_sentiment = 0.0  # neutral fallback if no text found
+        avg_sentiment: float = sum(compound_scores) / len(compound_scores) if compound_scores else 0.0
 
         # --- Satisfaction (normalise VADER -1…1 → 0…1) ---
         satisfaction: float = (avg_sentiment + 1) / 2
 
-        # --- Opportunity score ---
-        opportunity_score: float = importance * (1 - satisfaction)
+        # --- Source type diversity ---
+        source_types_in_cluster = {
+            chunk_source_map[cid] for cid in chunk_ids if cid in chunk_source_map
+        }
+        source_type_diversity: float = (
+            len(source_types_in_cluster) / total_source_types
+            if total_source_types > 0 else 0.0
+        )
+
+        # --- Three scores ---
+        odi_score: float = importance * (1 - satisfaction)
+        evidence_robustness: float = (source_type_diversity * 0.65) + (importance * 0.35)
+        priority_score: float = (odi_score * 0.60) + (evidence_robustness * 0.40)
 
         scored.append(
             {
@@ -79,10 +91,12 @@ def score_clusters(
                 "importance": round(importance, 4),
                 "avg_sentiment": round(avg_sentiment, 4),
                 "satisfaction": round(satisfaction, 4),
-                "opportunity_score": round(opportunity_score, 4),
+                "source_type_diversity": round(source_type_diversity, 4),
+                "odi_score": round(odi_score, 4),
+                "evidence_robustness": round(evidence_robustness, 4),
+                "priority_score": round(priority_score, 4),
             }
         )
 
-    # Sort highest opportunity first — convenient for results page
-    scored.sort(key=lambda x: x["opportunity_score"], reverse=True)
+    scored.sort(key=lambda x: x["priority_score"], reverse=True)
     return scored
