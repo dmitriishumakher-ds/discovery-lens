@@ -25,8 +25,16 @@ if TYPE_CHECKING:
     from streamlit.runtime.uploaded_file_manager import UploadedFile
 
 
-# Allowed source types — keep in sync with CLAUDE.md
-ALLOWED_SOURCE_TYPES = {"interview", "review", "ticket", "usability"}
+# Allowed source types — keep in sync with odi_scorer.py and CLAUDE.md.
+# Expanded May 13 2026: added "social" and "internal" per docs/decisions.md.
+ALLOWED_SOURCE_TYPES = {
+    "interview",
+    "review",
+    "ticket",
+    "usability",
+    "social",
+    "internal",
+}
 
 
 def extract_text(file: "UploadedFile", source_type: str) -> str:
@@ -78,6 +86,7 @@ def extract_text(file: "UploadedFile", source_type: str) -> str:
 # ---------------------------------------------------------------------------
 # Private helpers — one per file type
 # ---------------------------------------------------------------------------
+
 
 def _extract_pdf(file: "UploadedFile") -> str:
     """Extract text from a PDF using pypdf. Joins pages with double newlines."""

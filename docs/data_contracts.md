@@ -24,7 +24,7 @@ UploadedFile → extractor.py → raw_text (str)
 ```python
 # Input
 file: UploadedFile   # Streamlit UploadedFile object
-source_type: str     # one of: "interview" | "review" | "ticket" | "usability"
+source_type: str     # one of: "interview" | "review" | "ticket" | "usability" | "social" | "internal"
 
 # Output
 raw_text: str        # full extracted text, plain string
@@ -146,7 +146,7 @@ Notes:
 - Deterministic — no LLM, no external API. Uses VADER compound scores per chunk averaged per cluster.
 - `opportunity_score` retired Apr 29 2026. Replaced by three independent scores. PM sign-off: Lucas.
 - Sort key is `priority_score` descending.
-- `source_type_diversity` uses a fixed denominator `KNOWN_SOURCE_TYPES_COUNT = 4` (the size of the source_type enum: interview, review, ticket, usability). This makes the metric stable across single-source and multi-source sessions — a session with only reviews caps at 0.25, honestly reflecting weak cross-source evidence. PM sign-off: Lucas, May 12 2026.
+- `source_type_diversity` uses a fixed denominator `KNOWN_SOURCE_TYPES_COUNT = 6` (the size of the source_type enum: interview, review, ticket, usability, social, internal — expanded May 13 2026, see docs/decisions.md). This makes the metric stable across single-source and multi-source sessions — a session with only one source type caps at 0.1667 (1/6), honestly reflecting weak cross-source evidence. PM sign-off: Lucas, May 13 2026.
 
 ### Score definitions
 

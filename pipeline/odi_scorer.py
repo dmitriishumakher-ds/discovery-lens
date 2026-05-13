@@ -36,13 +36,20 @@ _SIZE_WEIGHT = 0.35  # evidence_robustness: normalised cluster size component
 _ODI_WEIGHT = 0.60  # priority_score: ODI component
 _EVIDENCE_WEIGHT = 0.40  # priority_score: evidence robustness component
 
-# Source-type enum recognised by the system.
+# Source-type enum recognised by the system (expanded May 13 2026: 4 → 6 types).
 # Kept in sync with the source_type contract in chunker.py / extractor.py.
 # Used as a FIXED denominator for source_type_diversity so the metric is:
 #   - stable across sessions (does not shrink when the user uploads fewer source types)
 #   - honest when only one source type is present (will not collapse to 1.0)
 #   - comparable across runs and PMs
-KNOWN_SOURCE_TYPES: tuple[str, ...] = ("interview", "review", "ticket", "usability")
+KNOWN_SOURCE_TYPES: tuple[str, ...] = (
+    "interview",
+    "review",
+    "ticket",
+    "usability",
+    "social",
+    "internal",
+)
 KNOWN_SOURCE_TYPES_COUNT: int = len(KNOWN_SOURCE_TYPES)
 
 

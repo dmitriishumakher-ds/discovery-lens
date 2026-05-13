@@ -23,9 +23,16 @@ from pathlib import Path
 import nltk
 from nltk.tokenize import sent_tokenize
 
-
-# Allowed source types — must match extractor.py and CLAUDE.md
-ALLOWED_SOURCE_TYPES = {"interview", "review", "ticket", "usability"}
+# Allowed source types — must match extractor.py and CLAUDE.md.
+# Expanded May 13 2026: added "social" and "internal" per docs/decisions.md.
+ALLOWED_SOURCE_TYPES = {
+    "interview",
+    "review",
+    "ticket",
+    "usability",
+    "social",
+    "internal",
+}
 
 # How many sentences go into a single chunk. Contract says 2–4.
 SENTENCES_PER_CHUNK = 3
