@@ -41,6 +41,16 @@ SENTENCES_PER_CHUNK = 3
 # artefacts of sentence splitting (e.g. "OK.", "Yeah.") and add noise to clusters.
 MIN_SENTENCE_LENGTH = 10
 
+# T-05: minimum chunk quality thresholds.
+# A chunk with only 1 short sentence embeds poorly (the embedding has no
+# semantic context to anchor on) and tends to be absorbed by the nearest
+# large cluster, inflating its importance. We require both:
+#   - At least MIN_SENTENCES_PER_CHUNK substantive sentences
+#   - At least MIN_TOKENS_PER_CHUNK whitespace tokens (~words)
+# Whitespace tokeniser is intentional — keeps the module dependency-free.
+MIN_SENTENCES_PER_CHUNK = 2
+MIN_TOKENS_PER_CHUNK = 15
+
 
 # Module-level flag so we only attempt to download punkt_tab once per process,
 # even if chunk_text() is called many times in a single Streamlit session.
@@ -101,6 +111,36 @@ def _safe_filename(filename: str) -> str:
     stem = Path(filename).stem.lower()
     slug = re.sub(r"[^a-z0-9]+", "_", stem)
     return slug.strip("_")
+
+
+def _is_chunk_substantive(text: str) -> bool:
+    """
+    T-05: filter out impoverished chunks before they reach clustering.
+
+    Returns True if the chunk meets both quality thresholds:
+      - At least MIN_SENTENCES_PER_CHUNK sentences (counted by punctuation)
+      - At least MIN_TOKENS_PER_CHUNK whitespace tokens
+
+    Short, vague chunks (single sentences, half-sentences, lone exclamations)
+    embed poorly. They get absorbed into the nearest large cluster and inflate
+    its importance score — which then biases priority_score downstream.
+    Filtering them at this stage is cheaper and more honest than trying to
+    recover from a noisy cluster later.
+
+    Counting sentences: split on .?! and count non-empty fragments. This is
+    approximate but cheap, and consistent with how we feed text to nltk.
+    Counting tokens: simple whitespace split. Not a true token count
+    (tokenisers vary), but a stable floor that requires no dependencies.
+    """
+    sentence_fragments = [s.strip() for s in re.split(r"[.?!]+", text) if s.strip()]
+    if len(sentence_fragments) < MIN_SENTENCES_PER_CHUNK:
+        return False
+
+    token_count = len(text.split())
+    if token_count < MIN_TOKENS_PER_CHUNK:
+        return False
+
+    return True
 
 
 def chunk_text(raw_text: str, filename: str, source_type: str) -> list[dict]:
@@ -183,6 +223,21 @@ def chunk_text(raw_text: str, filename: str, source_type: str) -> list[dict]:
                 "filename": filename,
                 "source_type": source_type,
             }
+        )
+
+    # --- T-05: filter impoverished chunks before dedup ---
+    # Single-sentence or sub-30-token chunks embed poorly. Drop them here
+    # so they don't get absorbed by a large cluster downstream.
+    chunks_before_filter = len(chunks)
+    chunks = [c for c in chunks if _is_chunk_substantive(c["text"])]
+    filtered_out = chunks_before_filter - len(chunks)
+    if filtered_out > 0:
+        # Logged at chunker level; the caller (2_upload.py) may surface to UI.
+        # No formal logger to avoid a new dependency — print is intentional
+        # and only fires when filtering actually removed something.
+        print(
+            f"[chunker:{filename}] T-05 filtered {filtered_out} impoverished chunks "
+            f"({chunks_before_filter} → {len(chunks)})"
         )
 
     # --- T-01: deduplicate on chunk text within this file ---
