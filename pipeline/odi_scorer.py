@@ -1,7 +1,7 @@
 """
 odi_scorer.py
 Computes deterministic priority signals per cluster.
-No LLM. No external API. Pure VADER + cluster metadata.
+No LLM. No external API. Pure sentiment scoring + cluster metadata.
 
 Input:
     clusters  — output of clusterer.py
@@ -22,19 +22,63 @@ Output:
                           "What should a PM act on first?"
 
 See docs/data_contracts.md for the full contract.
+
+Sentiment model: lxyuan/distilbert-base-multilingual-cased-sentiments-student
+Replaced VADER May 13 2026 — benchmark in notebooks/sentiment_benchmark_lucas.ipynb
+PM sign-off: Lucas.
 """
 
-from nltk.sentiment.vader import SentimentIntensityAnalyzer
+from transformers import pipeline as hf_pipeline
 from typing import Any
 
-# Initialise once at module level — avoids reloading the lexicon on every call
-_vader = SentimentIntensityAnalyzer()
+# Initialise once at module level — avoids reloading model weights on every call
+# framework="tf" required on Apple Silicon (arm64) to avoid PyTorch bus error
+_sentiment = hf_pipeline(
+    "sentiment-analysis",
+    model="lxyuan/distilbert-base-multilingual-cased-sentiments-student",
+    framework="tf",
+    truncation=True,
+    max_length=512,
+)
 
 # Weights — defined as constants so they are easy to tune and review
 _DIVERSITY_WEIGHT = 0.65       # evidence_robustness: source_type_diversity component
 _SIZE_WEIGHT = 0.35            # evidence_robustness: normalised cluster size component
 _ODI_WEIGHT = 0.60             # priority_score: ODI component
 _EVIDENCE_WEIGHT = 0.40        # priority_score: evidence robustness component
+
+# Fixed denominator — total recognised source types in the enum
+# Updated May 13 2026: expanded from 4 to 6 source types
+# interview, review, ticket, usability, social, internal
+_TOTAL_SOURCE_TYPES = 6
+
+
+def _score_to_compound(result: dict) -> float:
+    """
+    Convert lxyuan output to a -1…1 compound score analogous to VADER.
+    positive → +score, negative → -score, neutral → 0
+    """
+    label = result["label"].lower()
+    score = result["score"]
+    if label == "positive":
+        return score
+    elif label == "negative":
+        return -score
+    else:  # neutral
+        return 0.0
+
+
+def _batch_sentiment(texts: list[str], batch_size: int = 8) -> list[float]:
+    """
+    Run lxyuan on a list of texts in batches.
+    Returns a list of compound scores in range -1…1.
+    """
+    compounds = []
+    for i in range(0, len(texts), batch_size):
+        batch = texts[i:i + batch_size]
+        results = _sentiment(batch)
+        compounds.extend(_score_to_compound(r) for r in results)
+    return compounds
 
 
 def score_clusters(
@@ -46,14 +90,13 @@ def score_clusters(
 
     --- ODI score (unmet need signal) ---
     importance   = cluster_size / total_chunks          range 0–1
-    satisfaction = (avg_vader_compound + 1) / 2        range 0–1
+    satisfaction = (avg_sentiment_compound + 1) / 2    range 0–1
     odi_score    = importance × (1 - satisfaction)      range 0–1
 
     --- Evidence robustness (cross-source corroboration) ---
-    source_type_diversity = unique source types in cluster / total unique source types
+    source_type_diversity = unique source types in cluster / 6 (fixed denominator)
                             range 0–1
-    normalised_size       = cluster_size / total_chunks (same as importance)
-    evidence_robustness   = (diversity × 0.65) + (normalised_size × 0.35)
+    evidence_robustness   = (diversity × 0.65) + (importance × 0.35)
 
     --- Priority score (synthesis) ---
     priority_score = (odi_score × 0.60) + (evidence_robustness × 0.40)
@@ -74,10 +117,6 @@ def score_clusters(
 
     total_chunks: int = len(chunks)
 
-    # Total unique source types across ALL chunks — used to normalise diversity
-    all_source_types: set[str] = {c["source_type"] for c in chunks}
-    total_source_types: int = len(all_source_types)
-
     scored: list[dict[str, Any]] = []
 
     for cluster in clusters:
@@ -92,20 +131,19 @@ def score_clusters(
         # Importance — how large is this cluster relative to all chunks?
         importance: float = cluster_size / total_chunks
 
-        # Sentiment — VADER compound per chunk, then average across cluster
-        compound_scores: list[float] = []
-        for cid in chunk_ids:
-            text = chunk_text.get(cid)
-            if text:
-                compound_scores.append(_vader.polarity_scores(text)["compound"])
+        # Collect texts for all chunks in this cluster
+        texts_in_cluster = [
+            chunk_text[cid] for cid in chunk_ids if cid in chunk_text
+        ]
 
-        avg_sentiment: float = (
-            sum(compound_scores) / len(compound_scores)
-            if compound_scores
-            else 0.0  # neutral fallback if no text found
-        )
+        # Sentiment — lxyuan compound score per chunk, then average
+        if texts_in_cluster:
+            compound_scores = _batch_sentiment(texts_in_cluster)
+            avg_sentiment: float = sum(compound_scores) / len(compound_scores)
+        else:
+            avg_sentiment = 0.0  # neutral fallback if no text found
 
-        # Satisfaction — normalise VADER -1…1 → 0…1
+        # Satisfaction — normalise -1…1 → 0…1
         satisfaction: float = (avg_sentiment + 1) / 2
 
         # ODI score — high when need is large AND poorly satisfied
@@ -121,19 +159,12 @@ def score_clusters(
         }
         unique_in_cluster: int = len(cluster_source_types)
 
-        # Normalise: proportion of all available source types represented
-        source_type_diversity: float = (
-            unique_in_cluster / total_source_types
-            if total_source_types > 0
-            else 0.0
-        )
-
-        # Normalised size is the same value as importance — explicit for clarity
-        normalised_size: float = importance
+        # Fixed denominator of 6 — total recognised source types in the enum
+        source_type_diversity: float = unique_in_cluster / _TOTAL_SOURCE_TYPES
 
         evidence_robustness: float = (
             (source_type_diversity * _DIVERSITY_WEIGHT)
-            + (normalised_size * _SIZE_WEIGHT)
+            + (importance * _SIZE_WEIGHT)
         )
 
         # ------------------------------------------------------------------ #

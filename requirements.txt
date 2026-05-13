@@ -1,6 +1,5 @@
 # Discovery Lens — pip dependencies
-# All packages must be CPU-only and Streamlit Community Cloud compatible
-# Do not add new packages without PM sign-off
+# All packages are CPU-only
 
 # App framework
 streamlit>=1.32.0
@@ -17,7 +16,9 @@ numpy>=1.26.0
 
 # Sentiment
 nltk>=3.8.1
-vaderSentiment>=3.3.2
+transformers>=4.40.0
+tensorflow>=2.16.0
+tf-keras>=2.16.0
 
 # Visualisation
 plotly>=5.20.0
