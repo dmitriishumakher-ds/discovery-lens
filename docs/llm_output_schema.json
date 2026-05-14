@@ -1,15 +1,18 @@
 {
   "_meta": {
     "description": "Approved LLM output schema. Do not change without PM sign-off (Lucas).",
-    "last_updated": "2026-04-29",
+    "last_updated": "2026-05-13",
     "owner": "Lucas (schema), Lucas (llm.py + system prompt)",
     "changelog": {
-      "2026-04-29": "Replaced opportunity_score with three independent scores: odi_score, evidence_robustness, priority_score. All three are computed by odi_scorer.py and injected post-parse — never LLM-generated. PM sign-off: Lucas."
+      "2026-04-29": "Replaced opportunity_score with three independent scores: odi_score, evidence_robustness, priority_score. All three are computed by odi_scorer.py and injected post-parse — never LLM-generated. PM sign-off: Lucas.",
+      "2026-05-13": "Added job_type field (functional | emotional | social) to each opportunity. LLM-generated — not injected. PM sign-off: Lucas (assigned task)."
     }
   },
   "rules": {
     "json_only": "Return ONLY valid JSON. No preamble. No markdown fences.",
     "jtbd_format": "When I [situation], I want to [motivation], so I can [outcome].",
+    "job_type_values": "exactly: functional | emotional | social",
+    "job_type_classification": "functional = user wants to accomplish a task. emotional = user wants to feel a certain way or avoid a feeling. social = user wants to be perceived in a certain way. Default to functional.",
     "solutions_per_opportunity": "2-3",
     "assumptions_per_solution": "1-2",
     "risk_values": "exactly: low | medium | high",
@@ -25,6 +28,7 @@
     "opportunities": [
       {
         "jtbd": "When I first open the app after signing up, I want to understand what I can do with it, so I can decide if it is worth my time.",
+        "job_type": "functional",
         "cluster_id": 0,
         "importance": 0.38,
         "satisfaction": 0.27,

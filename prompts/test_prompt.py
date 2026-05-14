@@ -134,3 +134,15 @@ if len(unique_risks) > 1:
     print(f"✅ Risk distribution is non-uniform ({len(unique_risks)} distinct values used)")
 else:
     print(f"❌ Risk distribution is uniform — all assumptions labelled '{all_risks[0] if all_risks else 'none'}' (rubric may not be working)")
+
+# Check 7: job_type present and within enum on all opportunities
+print(f"\n=== JOB TYPE ===")
+valid_job_types = {"functional", "emotional", "social"}
+for o in opps:
+    job_type = o.get("job_type")
+    if job_type in valid_job_types:
+        print(f"✅ job_type OK for cluster {o['cluster_id']}: {job_type}")
+    elif job_type is None:
+        print(f"❌ job_type MISSING for cluster {o['cluster_id']}")
+    else:
+        print(f"❌ job_type INVALID for cluster {o['cluster_id']}: '{job_type}' (must be functional | emotional | social)")

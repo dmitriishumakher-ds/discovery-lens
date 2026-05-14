@@ -8,6 +8,7 @@ Schema:
   "opportunities": [
     {
       "jtbd": "When I [situation], I want to [motivation], so I can [outcome].",
+      "job_type": "functional|emotional|social",
       "cluster_id": <int>,
       "solutions": [
         {
@@ -32,6 +33,13 @@ Rules:
 5. Do not generate priority_score, importance, satisfaction, or opportunity_score. These are computed externally and injected after parsing.
 6. Do not invent data. Base every opportunity on the quotes provided.
 7. CRITICAL: You must return EXACTLY one opportunity per cluster. Count the clusters in the input. Return that exact number of opportunities — no more, no less. If you receive 3 clusters, return 3 opportunities. If you receive 5 clusters, return 5 opportunities. Never merge clusters. Never split clusters. The cluster_id in each opportunity must match the cluster_id from the input.
+8. Classify job_type for each opportunity using this rubric:
+   - functional = the user wants to accomplish a task or complete a process
+   - emotional   = the user wants to feel a certain way or avoid a negative feeling (e.g. anxiety, embarrassment, uncertainty)
+   - social      = the user wants to be perceived in a certain way by others (e.g. credible, competent, trustworthy)
+   If the cluster expresses a desired feeling or emotional state, use emotional.
+   If it expresses how the user wants to be perceived by others, use social.
+   Default to functional when the cluster does not clearly signal either.
 
 --- EXAMPLE 1 (B2B SaaS — project management) ---
 
@@ -51,7 +59,7 @@ Clusters:
 ]
 
 OUTPUT:
-{"goal":"Increase weekly active usage","opportunities":[{"jtbd":"When I post a comment for my team, I want to know it has been seen, so I can stop chasing responses on Slack.","cluster_id":0,"solutions":[{"label":"Read receipts on comments","assumptions":[{"text":"Users leave the tool to follow up on Slack because they have no visibility into whether comments were read.","risk":"high"}]},{"label":"Configurable notification digest","assumptions":[{"text":"Users would engage with notifications more if they could set a daily digest instead of real-time pings.","risk":"medium"}]}]}]}
+{"goal":"Increase weekly active usage","opportunities":[{"jtbd":"When I post a comment for my team, I want to know it has been seen, so I can stop chasing responses on Slack.","job_type":"functional","cluster_id":0,"solutions":[{"label":"Read receipts on comments","assumptions":[{"text":"Users leave the tool to follow up on Slack because they have no visibility into whether comments were read.","risk":"high"}]},{"label":"Configurable notification digest","assumptions":[{"text":"Users would engage with notifications more if they could set a daily digest instead of real-time pings.","risk":"medium"}]}]}]}
 
 --- EXAMPLE 2 (Consumer mobile — payments) ---
 
@@ -71,4 +79,44 @@ Clusters:
 ]
 
 OUTPUT:
-{"goal":"Reduce payment friction for first-time international transfers","opportunities":[{"jtbd":"When I set up an international transfer, I want to see a clear summary before confirming, so I can catch mistakes and understand the total cost.","cluster_id":0,"solutions":[{"label":"Pre-confirmation summary screen","assumptions":[{"text":"Users make errors because there is no summary step before the transfer is finalised.","risk":"high"}]},{"label":"Inline fee transparency","assumptions":[{"text":"Showing fees at the point of entry rather than at confirmation will reduce abandonment.","risk":"medium"}]},{"label":"Guided account selector","assumptions":[{"text":"Users are confused by multiple accounts and would benefit from a recommended default.","risk":"low"}]}]}]}
+{"goal":"Reduce payment friction for first-time international transfers","opportunities":[{"jtbd":"When I set up an international transfer, I want to see a clear summary before confirming, so I can catch mistakes and understand the total cost.","job_type":"functional","cluster_id":0,"solutions":[{"label":"Pre-confirmation summary screen","assumptions":[{"text":"Users make errors because there is no summary step before the transfer is finalised.","risk":"high"}]},{"label":"Inline fee transparency","assumptions":[{"text":"Showing fees at the point of entry rather than at confirmation will reduce abandonment.","risk":"medium"}]},{"label":"Guided account selector","assumptions":[{"text":"Users are confused by multiple accounts and would benefit from a recommended default.","risk":"low"}]}]}]}
+
+--- EXAMPLE 3 (Consumer fintech — emotional job) ---
+
+INPUT:
+Goal: Reduce anxiety for users sending international transfers
+
+Clusters:
+[
+  {
+    "cluster_id": 0,
+    "representative_chunks": [
+      {"text": "I sent the money but had no idea if it went through. Kept refreshing for hours.", "source_type": "interview"},
+      {"text": "No real-time status after sending. Just had to wait and hope for the best.", "source_type": "review"},
+      {"text": "The worst part isn't the fees — it's not knowing whether the transfer actually worked.", "source_type": "review"}
+    ]
+  }
+]
+
+OUTPUT:
+{"goal":"Reduce anxiety for users sending international transfers","opportunities":[{"jtbd":"When I send money internationally, I want to know the moment it is confirmed, so I can stop worrying and move on.","job_type":"emotional","cluster_id":0,"solutions":[{"label":"Real-time transfer status screen","assumptions":[{"text":"Users experience anxiety during the waiting period because there is no live status update after submission.","risk":"low"},{"text":"A dedicated status screen would reduce support contacts asking whether the transfer went through.","risk":"medium"}]},{"label":"Push notification on arrival confirmation","assumptions":[{"text":"Users would opt into transfer arrival notifications if offered at the point of sending.","risk":"medium"}]}]}]}
+
+--- EXAMPLE 4 (Consumer fintech — social job) ---
+
+INPUT:
+Goal: Help self-employed users look credible when managing business finances
+
+Clusters:
+[
+  {
+    "cluster_id": 0,
+    "representative_chunks": [
+      {"text": "I share my transaction history with my accountant but it always looks messy. I apologise every time I send it.", "source_type": "interview"},
+      {"text": "A client asked for a payment breakdown and I had to screenshot my feed. It looked so amateurish for a freelancer charging professional rates.", "source_type": "review"},
+      {"text": "I want something that looks like a proper business tool when I'm dealing with clients, not a consumer banking app.", "source_type": "interview"}
+    ]
+  }
+]
+
+OUTPUT:
+{"goal":"Help self-employed users look credible when managing business finances","opportunities":[{"jtbd":"When I share payment records with a client or accountant, I want to export a clean and professional summary, so I can be seen as an organised and trustworthy business owner.","job_type":"social","cluster_id":0,"solutions":[{"label":"Professional PDF transaction export","assumptions":[{"text":"Self-employed users currently share raw transaction feeds because no formatted export exists, which undermines their professional image.","risk":"low"},{"text":"A branded PDF export would be used regularly enough to justify the development cost.","risk":"medium"}]},{"label":"Client-facing payment receipt template","assumptions":[{"text":"Freelancers would pay for or upgrade to access a receipt template that matches their own branding.","risk":"high"}]}]}]}
