@@ -5,6 +5,7 @@ from pipeline.embedder import embed_chunks as embed
 from pipeline.clusterer import cluster
 from pipeline.odi_scorer import score_clusters as score
 from pipeline.llm import build_ost
+from pipeline.source_map import build_source_map
 
 st.set_page_config(page_title="Discovery Lens", layout="centered")
 
@@ -19,6 +20,7 @@ SOURCE_DESCRIPTIONS = {
 }
 
 goal = st.session_state.get("goal", "")
+context_block = st.session_state.get("context_block", "")
 if goal:
     st.markdown(
         f'<div style="background:#EEEDFE;border-left:4px solid #534AB7;border-radius:6px;'
@@ -208,20 +210,7 @@ elif st.session_state["pipeline_stage"] == "clustered":
                     st.session_state["ost"] = ost
                     st.write(f"✓ {len(ost.get('opportunities', []))} opportunities found")
 
-                    chunk_to_cluster = {}
-                    for cl in clusters:
-                        for cid in cl.get("all_chunk_ids", []):
-                            chunk_to_cluster[cid] = cl["cluster_id"]
-                    st.session_state["source_map"] = {
-                        c["chunk_id"]: {
-                            "text":        c["text"],
-                            "filename":    c["filename"],
-                            "source_type": c["source_type"],
-                            "cluster_id":  int(chunk_to_cluster[c["chunk_id"]])
-                                           if c["chunk_id"] in chunk_to_cluster else None,
-                        }
-                        for c in all_chunks
-                    }
+                    st.session_state["source_map"] = build_source_map(all_chunks, clusters)
                     status.update(label="OST ready!", state="complete")
 
                 st.session_state["pipeline_stage"] = "done"
