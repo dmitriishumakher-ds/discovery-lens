@@ -9,6 +9,8 @@ Schema:
     {
       "jtbd": "When I [situation], I want to [motivation], so I can [outcome].",
       "job_type": "functional|emotional|social",
+      "jtbd_confidence": "high|medium|low",
+      "jtbd_confidence_reason": "<one sentence>",
       "cluster_id": <int>,
       "solutions": [
         {
@@ -40,6 +42,11 @@ Rules:
    If the cluster expresses a desired feeling or emotional state, use emotional.
    If it expresses how the user wants to be perceived by others, use social.
    Default to functional when the cluster does not clearly signal either.
+9. Set jtbd_confidence and jtbd_confidence_reason for each opportunity:
+   - high   = all three parts (situation, motivation, outcome) are directly evidenced by quotes in this cluster
+   - medium = the JTBD is mostly supported but you had to infer at least one part from the quotes
+   - low    = the cluster lacks a clear triggering situation, or you had to abstract significantly beyond what the quotes state
+   Set jtbd_confidence_reason to exactly one sentence explaining your classification, referencing the evidence.
 
 --- EXAMPLE 1 (B2B SaaS — project management) ---
 
@@ -59,7 +66,7 @@ Clusters:
 ]
 
 OUTPUT:
-{"goal":"Increase weekly active usage","opportunities":[{"jtbd":"When I post a comment for my team, I want to know it has been seen, so I can stop chasing responses on Slack.","job_type":"functional","cluster_id":0,"solutions":[{"label":"Read receipts on comments","assumptions":[{"text":"Users leave the tool to follow up on Slack because they have no visibility into whether comments were read.","risk":"high"}]},{"label":"Configurable notification digest","assumptions":[{"text":"Users would engage with notifications more if they could set a daily digest instead of real-time pings.","risk":"medium"}]}]}]}
+{"goal":"Increase weekly active usage","opportunities":[{"jtbd":"When I post a comment for my team, I want to know it has been seen, so I can stop chasing responses on Slack.","job_type":"functional","jtbd_confidence":"high","jtbd_confidence_reason":"All three JTBD parts — posting a comment, wanting visibility, and stopping Slack follow-ups — are directly stated across the interview, review, and ticket quotes.","cluster_id":0,"solutions":[{"label":"Read receipts on comments","assumptions":[{"text":"Users leave the tool to follow up on Slack because they have no visibility into whether comments were read.","risk":"high"}]},{"label":"Configurable notification digest","assumptions":[{"text":"Users would engage with notifications more if they could set a daily digest instead of real-time pings.","risk":"medium"}]}]}]}
 
 --- EXAMPLE 2 (Consumer mobile — payments) ---
 
@@ -79,7 +86,7 @@ Clusters:
 ]
 
 OUTPUT:
-{"goal":"Reduce payment friction for first-time international transfers","opportunities":[{"jtbd":"When I set up an international transfer, I want to see a clear summary before confirming, so I can catch mistakes and understand the total cost.","job_type":"functional","cluster_id":0,"solutions":[{"label":"Pre-confirmation summary screen","assumptions":[{"text":"Users make errors because there is no summary step before the transfer is finalised.","risk":"high"}]},{"label":"Inline fee transparency","assumptions":[{"text":"Showing fees at the point of entry rather than at confirmation will reduce abandonment.","risk":"medium"}]},{"label":"Guided account selector","assumptions":[{"text":"Users are confused by multiple accounts and would benefit from a recommended default.","risk":"low"}]}]}]}
+{"goal":"Reduce payment friction for first-time international transfers","opportunities":[{"jtbd":"When I set up an international transfer, I want to see a clear summary before confirming, so I can catch mistakes and understand the total cost.","job_type":"functional","jtbd_confidence":"high","jtbd_confidence_reason":"The triggering situation, motivation, and outcome are each directly stated by the quotes about missing summary screens, hidden fees, and sending the wrong amount.","cluster_id":0,"solutions":[{"label":"Pre-confirmation summary screen","assumptions":[{"text":"Users make errors because there is no summary step before the transfer is finalised.","risk":"high"}]},{"label":"Inline fee transparency","assumptions":[{"text":"Showing fees at the point of entry rather than at confirmation will reduce abandonment.","risk":"medium"}]},{"label":"Guided account selector","assumptions":[{"text":"Users are confused by multiple accounts and would benefit from a recommended default.","risk":"low"}]}]}]}
 
 --- EXAMPLE 3 (Consumer fintech — emotional job) ---
 
@@ -99,7 +106,7 @@ Clusters:
 ]
 
 OUTPUT:
-{"goal":"Reduce anxiety for users sending international transfers","opportunities":[{"jtbd":"When I send money internationally, I want to know the moment it is confirmed, so I can stop worrying and move on.","job_type":"emotional","cluster_id":0,"solutions":[{"label":"Real-time transfer status screen","assumptions":[{"text":"Users experience anxiety during the waiting period because there is no live status update after submission.","risk":"low"},{"text":"A dedicated status screen would reduce support contacts asking whether the transfer went through.","risk":"medium"}]},{"label":"Push notification on arrival confirmation","assumptions":[{"text":"Users would opt into transfer arrival notifications if offered at the point of sending.","risk":"medium"}]}]}]}
+{"goal":"Reduce anxiety for users sending international transfers","opportunities":[{"jtbd":"When I send money internationally, I want to know the moment it is confirmed, so I can stop worrying and move on.","job_type":"emotional","jtbd_confidence":"medium","jtbd_confidence_reason":"The triggering situation and anxiety are directly evidenced, but the outcome 'move on' required inference beyond what the quotes explicitly state.","cluster_id":0,"solutions":[{"label":"Real-time transfer status screen","assumptions":[{"text":"Users experience anxiety during the waiting period because there is no live status update after submission.","risk":"low"},{"text":"A dedicated status screen would reduce support contacts asking whether the transfer went through.","risk":"medium"}]},{"label":"Push notification on arrival confirmation","assumptions":[{"text":"Users would opt into transfer arrival notifications if offered at the point of sending.","risk":"medium"}]}]}]}
 
 --- EXAMPLE 4 (Consumer fintech — social job) ---
 
@@ -119,4 +126,4 @@ Clusters:
 ]
 
 OUTPUT:
-{"goal":"Help self-employed users look credible when managing business finances","opportunities":[{"jtbd":"When I share payment records with a client or accountant, I want to export a clean and professional summary, so I can be seen as an organised and trustworthy business owner.","job_type":"social","cluster_id":0,"solutions":[{"label":"Professional PDF transaction export","assumptions":[{"text":"Self-employed users currently share raw transaction feeds because no formatted export exists, which undermines their professional image.","risk":"low"},{"text":"A branded PDF export would be used regularly enough to justify the development cost.","risk":"medium"}]},{"label":"Client-facing payment receipt template","assumptions":[{"text":"Freelancers would pay for or upgrade to access a receipt template that matches their own branding.","risk":"high"}]}]}]}
+{"goal":"Help self-employed users look credible when managing business finances","opportunities":[{"jtbd":"When I share payment records with a client or accountant, I want to export a clean and professional summary, so I can be seen as an organised and trustworthy business owner.","job_type":"social","jtbd_confidence":"high","jtbd_confidence_reason":"All three JTBD parts are grounded in the quotes — the sharing situation, the need for professional formatting, and the social outcome of appearing trustworthy are each explicitly evidenced.","cluster_id":0,"solutions":[{"label":"Professional PDF transaction export","assumptions":[{"text":"Self-employed users currently share raw transaction feeds because no formatted export exists, which undermines their professional image.","risk":"low"},{"text":"A branded PDF export would be used regularly enough to justify the development cost.","risk":"medium"}]},{"label":"Client-facing payment receipt template","assumptions":[{"text":"Freelancers would pay for or upgrade to access a receipt template that matches their own branding.","risk":"high"}]}]}]}

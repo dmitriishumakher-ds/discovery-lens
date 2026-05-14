@@ -43,6 +43,14 @@ _FORBIDDEN_FIELDS = set(_INJECT_FIELDS) | {"opportunity_score"}
 # Valid risk labels as defined in the system prompt rubric.
 _VALID_RISK_VALUES = {"low", "medium", "high"}
 
+# Valid confidence labels for jtbd_confidence.
+_VALID_CONFIDENCE_VALUES = {"high", "medium", "low"}
+
+# Clusters with this many chunks or fewer get a deterministic low-confidence
+# override post-parse, regardless of what the LLM returned. With so little
+# evidence the model is likely abstracting beyond the quotes.
+MIN_CLUSTER_SIZE = 3
+
 
 # ── Custom exception ───────────────────────────────────────────────────────────
 
@@ -217,12 +225,15 @@ def _validate_ost(ost: dict, clusters: list[dict]) -> None:
     forbidden score fields while producing perfectly valid JSON.
 
     Checks performed (in order):
-        1. Opportunity count matches cluster count
-        2. No hallucinated cluster_ids (every opp ID must exist in input)
-        3. No duplicate cluster_ids across opportunities
-        4. No missing clusters (every input cluster has an opportunity)
-        5. All risk values are in {low, medium, high}
-        6. No forbidden score fields present on any opportunity
+        1.  Opportunity count matches cluster count
+        2.  No hallucinated cluster_ids (every opp ID must exist in input)
+        3.  No duplicate cluster_ids across opportunities
+        4.  No missing clusters (every input cluster has an opportunity)
+        5.  All risk values are in {low, medium, high}
+        5b. Each opportunity has exactly 2–3 solutions
+        6.  No forbidden score fields present on any opportunity
+        7.  jtbd_confidence present and in {high, medium, low}
+        8.  jtbd_confidence_reason present and non-empty
     """
 
     # Build the set of cluster_ids we expect to see in the output.
@@ -297,6 +308,18 @@ def _validate_ost(ost: dict, clusters: list[dict]) -> None:
             f"Must be exactly one of: {sorted(_VALID_RISK_VALUES)}."
         )
 
+    # ── Check 5b: solution count per opportunity ──────────────────────────────
+    # The system prompt Rule 2 is CRITICAL: every opportunity must have 2–3
+    # solutions. Zero or one solutions is not useful to the PM; more than three
+    # means the model ignored the cap. Both cases indicate prompt non-compliance.
+    for opp in opportunities:
+        n_solutions = len(opp.get("solutions", []))
+        if not (2 <= n_solutions <= 3):
+            raise _OSTValidationError(
+                f"Opportunity cluster_id {opp.get('cluster_id')} has {n_solutions} "
+                f"solution(s) — must be exactly 2 or 3 (system prompt Rule 2)."
+            )
+
     # ── Check 6: no forbidden score fields ───────────────────────────────────
     # Score fields are computed deterministically by odi_scorer.py and injected
     # post-parse. If the LLM generated them, we would overwrite them anyway —
@@ -309,6 +332,29 @@ def _validate_ost(ost: dict, clusters: list[dict]) -> None:
                 f"LLM generated forbidden score field(s) on cluster_id "
                 f"{opp.get('cluster_id')}: {sorted(found)}. "
                 f"These must be computed by odi_scorer.py, not the LLM."
+            )
+
+    # ── Check 7: jtbd_confidence value ───────────────────────────────────────
+    # The LLM must generate jtbd_confidence for every opportunity. Invalid or
+    # missing values mean the model ignored Rule 9 in the system prompt.
+    for opp in opportunities:
+        confidence = opp.get("jtbd_confidence")
+        if confidence not in _VALID_CONFIDENCE_VALUES:
+            raise _OSTValidationError(
+                f"Invalid or missing jtbd_confidence on cluster_id "
+                f"{opp.get('cluster_id')}: {confidence!r}. "
+                f"Must be one of: {sorted(_VALID_CONFIDENCE_VALUES)}."
+            )
+
+    # ── Check 8: jtbd_confidence_reason present and non-empty ────────────────
+    # The reason must be a non-empty string. An empty string means the model
+    # generated the field but provided no explanation — not useful to the PM.
+    for opp in opportunities:
+        reason = opp.get("jtbd_confidence_reason")
+        if not isinstance(reason, str) or not reason.strip():
+            raise _OSTValidationError(
+                f"Missing or empty jtbd_confidence_reason on cluster_id "
+                f"{opp.get('cluster_id')}. Must be a non-empty sentence."
             )
 
     # All checks passed — return normally (None).
@@ -334,6 +380,49 @@ def _merge_scores(ost: dict, scored_clusters: list[dict]) -> dict:
 
         for field in _INJECT_FIELDS:
             opportunity[field] = sc[field] if sc and field in sc else None
+
+    return ost
+
+
+def _apply_confidence_override(ost: dict, clusters: list[dict]) -> dict:
+    """
+    Deterministic post-parse override for jtbd_confidence on sparse clusters.
+
+    Clusters with all_chunk_ids length <= MIN_CLUSTER_SIZE receive:
+        jtbd_confidence        = "low"
+        jtbd_confidence_reason = a sentence stating the exact chunk count
+
+    This runs after _validate_ost (so the LLM fields are already confirmed
+    valid) and before _merge_scores. The override is intentionally explicit —
+    the PM sees the chunk count rather than a vague LLM-generated reason,
+    which makes it actionable: go collect more evidence for this theme.
+
+    Mutates ost in place and returns it.
+    """
+    # Build a lookup from cluster_id → chunk count using all_chunk_ids.
+    # Note: all_chunk_ids is NOT sent to the LLM (stripped in _build_user_message)
+    # so the LLM cannot know the cluster size — the override is the only
+    # reliable way to enforce the low-confidence floor for sparse clusters.
+    chunk_count_by_id: dict[int, int] = {
+        c["cluster_id"]: len(c.get("all_chunk_ids", []))
+        for c in clusters
+    }
+
+    for opportunity in ost.get("opportunities", []):
+        cluster_id = opportunity.get("cluster_id")
+        chunk_count = chunk_count_by_id.get(cluster_id, 0)
+
+        if chunk_count <= MIN_CLUSTER_SIZE:
+            # Override whatever the LLM said — the evidence floor is not met.
+            opportunity["jtbd_confidence"] = "low"
+            opportunity["jtbd_confidence_reason"] = (
+                f"Only {chunk_count} chunk(s) of evidence in this cluster — "
+                f"too few to reliably ground all three parts of the JTBD."
+            )
+            print(
+                f"[llm] Confidence override applied to cluster_id {cluster_id}: "
+                f"{chunk_count} chunk(s) <= MIN_CLUSTER_SIZE ({MIN_CLUSTER_SIZE})"
+            )
 
     return ost
 
@@ -462,6 +551,12 @@ def build_ost(
             ) from e
 
         ost = ost_fallback
+
+    # ── Deterministic confidence override for sparse clusters ─────────────────
+    # Must run after _validate_ost (fields confirmed present) and before
+    # _merge_scores (scores not yet injected). Clusters with <= MIN_CLUSTER_SIZE
+    # chunks get jtbd_confidence forced to "low" with the exact chunk count.
+    ost = _apply_confidence_override(ost, clusters)
 
     # ── Inject scores — never trust the LLM to compute these ─────────────────
     # _validate_ost already confirmed no forbidden fields are present, so this

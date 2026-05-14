@@ -130,7 +130,7 @@ chunks: list[dict]     # output of chunker.py
     "cluster_size": int,
     # --- Raw signals (available for UI display and debugging) ---
     "importance": float,             # cluster_size / total_chunks, range 0.0–1.0
-    "avg_sentiment": float,          # raw VADER compound mean, range -1.0 to 1.0
+    "avg_sentiment": float,          # lxyuan compound mean (positive→+score, negative→-score, neutral→0), range -1.0 to 1.0
     "satisfaction": float,           # (avg_sentiment + 1) / 2, range 0.0–1.0
     "source_type_diversity": float,  # unique source types in cluster / KNOWN_SOURCE_TYPES_COUNT (=4), range 0.0–1.0
     # --- Three scores shown independently in UI ---
@@ -143,7 +143,7 @@ chunks: list[dict]     # output of chunker.py
 ```
 
 Notes:
-- Deterministic — no LLM, no external API. Uses VADER compound scores per chunk averaged per cluster.
+- Deterministic — no LLM, no external API. Uses lxyuan/distilbert-base-multilingual-cased-sentiments-student compound scores per chunk averaged per cluster. Replaced VADER May 13 2026.
 - `opportunity_score` retired Apr 29 2026. Replaced by three independent scores. PM sign-off: Lucas.
 - Sort key is `priority_score` descending.
 - `source_type_diversity` uses a fixed denominator `KNOWN_SOURCE_TYPES_COUNT = 6` (the size of the source_type enum: interview, review, ticket, usability, social, internal — expanded May 13 2026, see docs/decisions.md). This makes the metric stable across single-source and multi-source sessions — a session with only one source type caps at 0.1667 (1/6), honestly reflecting weak cross-source evidence. PM sign-off: Lucas, May 13 2026.
@@ -171,8 +171,10 @@ goal: str                     # from st.session_state["goal"]
   "goal": str,
   "opportunities": [
     {
-      "jtbd": str,        # strictly: "When I [situation], I want to [motivation], so I can [outcome]."
-      "job_type": str,    # "functional" | "emotional" | "social" — LLM-generated, not injected
+      "jtbd": str,                    # strictly: "When I [situation], I want to [motivation], so I can [outcome]."
+      "job_type": str,                # "functional" | "emotional" | "social" — LLM-generated, not injected
+      "jtbd_confidence": str,         # "high" | "medium" | "low" — LLM-generated; overridden to "low" for clusters with <= 3 chunks
+      "jtbd_confidence_reason": str,  # one sentence — LLM-generated; deterministic for overridden clusters (states chunk count)
       "cluster_id": int,
       "solutions": [
         {
@@ -195,7 +197,9 @@ goal: str                     # from st.session_state["goal"]
   "opportunities": [
     {
       "jtbd": str,
-      "job_type": str,    # "functional" | "emotional" | "social" — passed through from LLM
+      "job_type": str,                # passed through from LLM
+      "jtbd_confidence": str,         # passed through from LLM, or "low" if overridden
+      "jtbd_confidence_reason": str,  # passed through from LLM, or chunk-count sentence if overridden
       "cluster_id": int,
       # --- Injected from scored_clusters, never LLM-generated ---
       "importance": float | None,
