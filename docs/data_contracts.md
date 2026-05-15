@@ -176,6 +176,9 @@ Notes:
 clusters: list[dict]          # output of clusterer.py
 scored_clusters: list[dict]   # output of odi_scorer.py
 goal: str                     # from st.session_state["goal"]
+context_block: str            # from st.session_state["context_block"], default ""
+                              # max 500 words — truncated at upload step before storage
+                              # injected into user message after cluster evidence; omitted if empty
 
 # LLM generates via Groq — JTBD and solutions only, no score fields
 {
@@ -239,6 +242,7 @@ Notes:
 ```python
 st.session_state["goal"]            # str — product goal statement
 st.session_state["product_name"]    # str — product name
+st.session_state["context_block"]   # str — stakeholder/constraint context, max 500 words, default ""
 st.session_state["chunks"]          # list[dict] — output of chunker.py
 st.session_state["embeddings"]      # np.ndarray — output of embedder.py
 st.session_state["clusters"]        # list[dict] — output of clusterer.py

@@ -1,4 +1,5 @@
 import streamlit as st
+import pypdf
 from pipeline.extractor import extract_text as extract
 from pipeline.chunker import chunk_text as chunk
 from pipeline.embedder import embed_chunks as embed
@@ -63,6 +64,50 @@ if st.session_state["pipeline_stage"] is None:
                 )
             st.caption(SOURCE_DESCRIPTIONS[src])
             file_configs.append({"file": f, "source_type": src})
+
+        # ── Optional stakeholder context ──────────────────────────────────────
+        _MAX_CONTEXT_WORDS = 500
+        with st.expander("Stakeholder context (optional)"):
+            st.caption(
+                "Add constraints, stakeholder priorities, or known assumptions "
+                "that should influence the analysis. Max 500 words."
+            )
+            context_typed = st.text_area(
+                "Type context",
+                placeholder=(
+                    "e.g. Engineering has flagged real-time notifications as out "
+                    "of scope this quarter. The PM has already committed to "
+                    "improving the onboarding flow…"
+                ),
+                height=140,
+                label_visibility="collapsed",
+                key="_context_typed_raw",
+            )
+            context_pdf = st.file_uploader(
+                "Or upload a context PDF",
+                type=["pdf"],
+                key="_context_pdf",
+            )
+            context_pdf_text = ""
+            if context_pdf is not None:
+                reader = pypdf.PdfReader(context_pdf)
+                context_pdf_text = "\n".join(
+                    page.extract_text() or "" for page in reader.pages
+                ).strip()
+
+            combined = "\n\n".join(
+                part for part in [context_typed.strip(), context_pdf_text] if part
+            )
+            words = combined.split()
+            if len(words) > _MAX_CONTEXT_WORDS:
+                st.warning(
+                    f"Context truncated from {len(words)} to {_MAX_CONTEXT_WORDS} words."
+                )
+                st.session_state["context_block"] = " ".join(words[:_MAX_CONTEXT_WORDS])
+            else:
+                st.session_state["context_block"] = combined
+            if combined:
+                st.caption(f"{min(len(words), _MAX_CONTEXT_WORDS)} / {_MAX_CONTEXT_WORDS} words")
 
         st.divider()
         if st.button("Analyse clusters →", type="primary"):
@@ -196,7 +241,7 @@ elif st.session_state["pipeline_stage"] == "clustered":
 
                     st.write("Calling LLM…")
                     try:
-                        ost = build_ost(clusters, scored, goal)
+                        ost = build_ost(clusters, scored, goal, context_block)
                     except RuntimeError as llm_err:
                         err_str = str(llm_err).lower()
                         if "rate limit" in err_str or "429" in err_str:
