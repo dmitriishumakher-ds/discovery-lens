@@ -19,3 +19,8 @@ docs/context/
 test_pipeline_headless.py
 context/
 data/lidl/
+data/synthetic/asana/
+data/synthetic/lidl_plus_app/
+data/synthetic/revolut/
+data/synthetic/notion_synthetic_dataset/
+data/synthetic/notion_synthetic_dataset.zip

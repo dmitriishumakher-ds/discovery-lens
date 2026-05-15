@@ -43,9 +43,10 @@ Rules:
    If it expresses how the user wants to be perceived by others, use social.
    Default to functional when the cluster does not clearly signal either.
 9. Set jtbd_confidence and jtbd_confidence_reason for each opportunity:
-   - high   = all three parts (situation, motivation, outcome) are directly evidenced by quotes in this cluster
-   - medium = the JTBD is mostly supported but you had to infer at least one part from the quotes
-   - low    = the cluster lacks a clear triggering situation, or you had to abstract significantly beyond what the quotes state
+   - high   = all three parts (situation, motivation, outcome) are directly evidenced by quotes in this cluster, and cluster_size is large enough to suggest the theme is recurring
+   - medium = the JTBD is mostly supported but you had to infer at least one part from the quotes, or cluster_size is modest (5-15 chunks)
+   - low    = the cluster lacks a clear triggering situation, you had to abstract significantly beyond what the quotes state, or cluster_size is very small (under 5 chunks)
+   Each cluster includes a cluster_size field indicating how many discovery chunks belong to that theme. Larger clusters mean broader evidence; smaller ones mean a narrower or noisier signal.
    Set jtbd_confidence_reason to exactly one sentence explaining your classification, referencing the evidence.
 
 --- EXAMPLE 1 (B2B SaaS — project management) ---

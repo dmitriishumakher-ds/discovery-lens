@@ -54,16 +54,19 @@ MIN_CLUSTER_SIZE = 3
 
 # ── Custom exception ───────────────────────────────────────────────────────────
 
+
 class _OSTValidationError(ValueError):
     """
     Raised by _validate_ost when a syntactically valid OST dict fails
     structural or content checks. Distinct from json.JSONDecodeError so
     build_ost can log the failure reason accurately before falling back.
     """
+
     pass
 
 
 # ── Internal helpers ───────────────────────────────────────────────────────────
+
 
 def _load_system_prompt() -> str:
     """Load system prompt from file. Raises clearly if missing."""
@@ -77,28 +80,40 @@ def _load_system_prompt() -> str:
 
 def _build_user_message(clusters: list[dict], goal: str, context_block: str = "") -> str:
     """
-    Format the user message sent to the LLM.
-    Only passes cluster_id and representative_chunks — not all_chunk_ids,
-    which would bloat the context window unnecessarily.
-    context_block is appended after the cluster evidence if non-empty,
-    and omitted entirely if empty so the prompt is unchanged for callers
-    that do not provide it.
-    """
-    slim_clusters = [
-        {
-            "cluster_id": c["cluster_id"],
-            "representative_chunks": [
-                {"text": chunk["text"], "source_type": chunk["source_type"]}
-                for chunk in c["representative_chunks"]
-            ],
-        }
-        for c in clusters
-    ]
+    T-10 hybrid chunk selection: each cluster contributes 3 chunks total —
+    the top 2 by HDBSCAN membership probability (cluster core, theme signal)
+    plus 1 boundary chunk (lowest membership, texture/outlier language).
 
-    msg = (
-        f"Goal: {goal}\n\n"
-        f"Clusters:\n{json.dumps(slim_clusters, indent=2)}"
-    )
+    cluster_size is passed so the model can calibrate jtbd_confidence per Rule 9.
+    context_block is appended after cluster evidence if non-empty, omitted if empty.
+    """
+
+    def _format_chunk(chunk: dict) -> dict:
+        return {"text": chunk["text"], "source_type": chunk["source_type"]}
+
+    slim_clusters: list[dict] = []
+    for c in clusters:
+        core_chunks = [_format_chunk(ch) for ch in c["representative_chunks"][:2]]
+
+        boundary_list = c.get("boundary_chunks") or []
+        if boundary_list:
+            boundary_chunk = _format_chunk(boundary_list[0])
+        elif len(c["representative_chunks"]) > 2:
+            boundary_chunk = _format_chunk(c["representative_chunks"][2])
+        else:
+            boundary_chunk = None
+
+        chunks_for_prompt = core_chunks + ([boundary_chunk] if boundary_chunk else [])
+
+        slim_clusters.append(
+            {
+                "cluster_id": c["cluster_id"],
+                "cluster_size": len(c.get("all_chunk_ids", [])),
+                "representative_chunks": chunks_for_prompt,
+            }
+        )
+
+    msg = f"Goal: {goal}\n\nClusters:\n{json.dumps(slim_clusters, indent=2)}"
     if context_block:
         msg += f"\n\nStakeholder context:\n{context_block}"
     return msg
@@ -202,7 +217,9 @@ def _parse_json(raw: str) -> dict:
             # Strip trailing commas in the sliced block first.
             slice_comma_cleaned = re.sub(r",\s*([}\]])", r"\1", slice_from_brace)
             obj, _ = json.JSONDecoder().raw_decode(slice_comma_cleaned, 0)
-            print("[llm] JSON repair succeeded via: raw_decode + trailing comma removal")
+            print(
+                "[llm] JSON repair succeeded via: raw_decode + trailing comma removal"
+            )
             return obj
         except json.JSONDecodeError:
             pass
@@ -376,9 +393,7 @@ def _merge_scores(ost: dict, scored_clusters: list[dict]) -> dict:
     Matches on cluster_id. Sets all score fields to null if no match found.
     Mutates ost in place and returns it.
     """
-    scores_by_id: dict[int, dict] = {
-        sc["cluster_id"]: sc for sc in scored_clusters
-    }
+    scores_by_id: dict[int, dict] = {sc["cluster_id"]: sc for sc in scored_clusters}
 
     for opportunity in ost.get("opportunities", []):
         cluster_id = opportunity.get("cluster_id")
@@ -410,8 +425,7 @@ def _apply_confidence_override(ost: dict, clusters: list[dict]) -> dict:
     # so the LLM cannot know the cluster size — the override is the only
     # reliable way to enforce the low-confidence floor for sparse clusters.
     chunk_count_by_id: dict[int, int] = {
-        c["cluster_id"]: len(c.get("all_chunk_ids", []))
-        for c in clusters
+        c["cluster_id"]: len(c.get("all_chunk_ids", [])) for c in clusters
     }
 
     for opportunity in ost.get("opportunities", []):
@@ -434,6 +448,7 @@ def _apply_confidence_override(ost: dict, clusters: list[dict]) -> dict:
 
 
 # ── Public interface ───────────────────────────────────────────────────────────
+
 
 def build_ost(
     clusters: list[dict],
@@ -548,12 +563,9 @@ def build_ost(
         except _OSTValidationError as e:
             expected_ids = sorted(c["cluster_id"] for c in clusters)
             opp_ids = sorted(
-                o.get("cluster_id")
-                for o in ost_fallback.get("opportunities", [])
+                o.get("cluster_id") for o in ost_fallback.get("opportunities", [])
             )
-            missing_ids = sorted(
-                set(expected_ids) - set(opp_ids)
-            )
+            missing_ids = sorted(set(expected_ids) - set(opp_ids))
             raise RuntimeError(
                 f"Both models produced structurally invalid OST output.\n"
                 f"  Primary failure:    {primary_failure_reason}\n"
