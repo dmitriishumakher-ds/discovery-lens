@@ -2,20 +2,25 @@
 from sentence_transformers import SentenceTransformer
 import numpy as np
 
-
-# This variable lives at the "top level" of the file that any function in this file can read. We start it as None (empty) because the model hasn't been loaded yet.
-_model = None
-
-
-def _get_model():
-    """
-    Loads the embedding model the first time it's needed, then reuses it because Streamlit reruns the whole file on every user interaction.
-    If we loaded the model at the top, it would reload from disk every time. This function checks if the model is already loaded and only loads it once. This pattern is called a "singleton", there is only ever one instance of the model in memory.
-    """
-    global _model # 'global' tells Python: when we say _model inside this function, we mean the _model noticeboard at the top of the file — NOT a new local variable that only exists inside this function.
-    if _model is None: # If _model is still None, nobody has loaded it yet — load it now. Next time this function is called, _model will already be set, so we skip straight to the return.
-        _model = SentenceTransformer("all-MiniLM-L6-v2")
-    return _model
+# Lazy-loaded embedding model. @st.cache_resource keeps the loaded model in
+# memory across Streamlit reruns — without it, every user interaction would
+# reload the ~80MB all-MiniLM-L6-v2 model from disk. Falls back to a plain
+# module-level singleton when Streamlit isn't available (e.g. when this module
+# is imported from a notebook or CLI test).
+try:
+    import streamlit as st
+    @st.cache_resource
+    def _get_model():
+        """Load the all-MiniLM-L6-v2 embedding model once per Streamlit session."""
+        return SentenceTransformer("all-MiniLM-L6-v2")
+except ImportError:
+    _model = None
+    def _get_model():
+        """Load the all-MiniLM-L6-v2 embedding model once per Python process."""
+        global _model
+        if _model is None:
+            _model = SentenceTransformer("all-MiniLM-L6-v2")
+        return _model
 
 def embed_chunks(chunks: list[dict]) -> np.ndarray: #Converts a list of text chunks into a 2D array of embeddings.
     model = _get_model() # Load the model (or reuse it if already loaded).
