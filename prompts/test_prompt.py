@@ -146,3 +146,46 @@ for o in opps:
         print(f"❌ job_type MISSING for cluster {o['cluster_id']}")
     else:
         print(f"❌ job_type INVALID for cluster {o['cluster_id']}: '{job_type}' (must be functional | emotional | social)")
+
+all_job_types = [o.get("job_type") for o in opps]
+non_functional = [jt for jt in all_job_types if jt != "functional"]
+pct_functional = all_job_types.count("functional") / len(all_job_types) * 100 if all_job_types else 0
+print(f"\n  Distribution: {dict((jt, all_job_types.count(jt)) for jt in valid_job_types)}")
+if pct_functional > 90:
+    print(f"⚠️  {pct_functional:.0f}% functional — emotional/social rubric may need stronger examples")
+else:
+    print(f"✅ job_type distribution looks varied ({pct_functional:.0f}% functional)")
+
+# Check 8: jtbd_confidence present and within enum on all opportunities
+print(f"\n=== JTBD CONFIDENCE ===")
+valid_confidence = {"high", "medium", "low"}
+for o in opps:
+    confidence = o.get("jtbd_confidence")
+    reason = o.get("jtbd_confidence_reason", "")
+    if confidence in valid_confidence:
+        print(f"✅ jtbd_confidence OK for cluster {o['cluster_id']}: {confidence}")
+        print(f"   reason: {reason[:120]}")
+    elif confidence is None:
+        print(f"❌ jtbd_confidence MISSING for cluster {o['cluster_id']}")
+    else:
+        print(f"❌ jtbd_confidence INVALID for cluster {o['cluster_id']}: '{confidence}'")
+    if not reason.strip():
+        print(f"❌ jtbd_confidence_reason EMPTY for cluster {o['cluster_id']}")
+
+# Check 9: jtbd_confidence distribution not uniformly "high"
+all_confidences = [o.get("jtbd_confidence") for o in opps]
+print(f"\n  Distribution: {dict((c, all_confidences.count(c)) for c in valid_confidence)}")
+if all(c == "high" for c in all_confidences):
+    print(f"⚠️  All jtbd_confidence values are 'high' — rubric instruction may not be working")
+else:
+    print(f"✅ jtbd_confidence distribution is non-uniform")
+
+# Check 10: JTBD regex format (consistent with _JTBD_RE in llm.py)
+print(f"\n=== JTBD REGEX FORMAT ===")
+jtbd_re = re.compile(r"^When I.+, I want to .+, so I can .+\.$")
+for o in opps:
+    jtbd = o.get("jtbd", "")
+    if jtbd_re.match(jtbd):
+        print(f"✅ JTBD regex OK for cluster {o['cluster_id']}: {jtbd[:90]}")
+    else:
+        print(f"❌ JTBD regex FAIL for cluster {o['cluster_id']}: {jtbd!r}")

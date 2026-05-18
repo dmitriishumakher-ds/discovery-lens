@@ -26,6 +26,9 @@ Schema:
 
 Rules:
 1. Every jtbd must follow exactly: "When I [situation], I want to [motivation], so I can [outcome]."
+   The motivation describes what the USER wants to do or achieve — never what they want a feature or product to do.
+   FORBIDDEN: "I want it to...", "I want them to...", "I want the app to..." — these describe product behaviour, not user motivation.
+   CORRECT: "I want to feel...", "I want to know...", "I want to find...", "I want to stop..."
 2. CRITICAL: Every opportunity must have between 2 and 3 solutions. Never return fewer than 2 solutions per opportunity.
 3. 1-2 assumptions per solution. Must be falsifiable.
 4. Risk must be exactly "low", "medium", or "high" using this rubric:
@@ -37,16 +40,20 @@ Rules:
 7. CRITICAL: You must return EXACTLY one opportunity per cluster. Count the clusters in the input. Return that exact number of opportunities — no more, no less. If you receive 3 clusters, return 3 opportunities. If you receive 5 clusters, return 5 opportunities. Never merge clusters. Never split clusters. The cluster_id in each opportunity must match the cluster_id from the input.
 8. Classify job_type for each opportunity using this rubric:
    - functional = the user wants to accomplish a task or complete a process
-   - emotional   = the user wants to feel a certain way or avoid a negative feeling (e.g. anxiety, embarrassment, uncertainty)
-   - social      = the user wants to be perceived in a certain way by others (e.g. credible, competent, trustworthy)
-   If the cluster expresses a desired feeling or emotional state, use emotional.
-   If it expresses how the user wants to be perceived by others, use social.
+   - emotional   = the user wants to feel a certain way or avoid a negative feeling (internal: anxiety, embarrassment, pride, relief)
+   - social      = the user wants to be perceived in a certain way by others, OR the user's language ties their identity or status to how other people see them
+   Key distinction — emotional vs social:
+     emotional = the feeling is internal ("I don't want to feel embarrassed", "I want to feel confident")
+     social    = the audience is external ("I want others to see me as...", "I want to be known as someone who...", "I mentioned it to people at work")
+   If the cluster contains language about the user's reputation, how others perceive them, or identity signals directed at an audience, use social even if there is also emotional language present.
+   If the cluster expresses a feeling with no reference to an external audience, use emotional.
    Default to functional when the cluster does not clearly signal either.
 9. Set jtbd_confidence and jtbd_confidence_reason for each opportunity:
-   - high   = all three parts (situation, motivation, outcome) are directly evidenced by quotes in this cluster, and cluster_size is large enough to suggest the theme is recurring
-   - medium = the JTBD is mostly supported but you had to infer at least one part from the quotes, or cluster_size is modest (5-15 chunks)
-   - low    = the cluster lacks a clear triggering situation, you had to abstract significantly beyond what the quotes state, or cluster_size is very small (under 5 chunks)
-   Each cluster includes a cluster_size field indicating how many discovery chunks belong to that theme. Larger clusters mean broader evidence; smaller ones mean a narrower or noisier signal.
+   - high   = all three parts (situation, motivation, outcome) are word-for-word grounded in the quotes with no inference required, AND cluster_size is 15 or more. Do NOT assign high if you inferred any part.
+   - medium = you had to infer at least one part from the quotes, OR cluster_size is between 5 and 14. Medium is the most common value — when in doubt, use medium.
+   - low    = the cluster lacks a clear triggering situation, OR you had to abstract significantly beyond the quotes, OR cluster_size is under 5.
+   Each cluster includes a cluster_size field. Use it: cluster_size >= 15 is a prerequisite for high, not a guarantee.
+   Default to medium when unsure. High should be rare — reserve it for cases where every JTBD part is explicitly stated verbatim in the evidence.
    Set jtbd_confidence_reason to exactly one sentence explaining your classification, referencing the evidence.
 
 --- EXAMPLE 1 (B2B SaaS — project management) ---

@@ -46,6 +46,10 @@ _VALID_RISK_VALUES = {"low", "medium", "high"}
 # Valid confidence labels for jtbd_confidence.
 _VALID_CONFIDENCE_VALUES = {"high", "medium", "low"}
 
+# JTBD format: "When I [situation], I want to [motivation], so I can [outcome]."
+# No required space after "I" — allows natural contractions: "When I'm...", "When I've..."
+_JTBD_RE = re.compile(r"^When I.+, I want to .+, so I can .+\.$")
+
 # Clusters with this many chunks or fewer get a deterministic low-confidence
 # override post-parse, regardless of what the LLM returned. With so little
 # evidence the model is likely abstracting beyond the quotes.
@@ -257,6 +261,7 @@ def _validate_ost(ost: dict, clusters: list[dict]) -> None:
         6.  No forbidden score fields present on any opportunity
         7.  jtbd_confidence present and in {high, medium, low}
         8.  jtbd_confidence_reason present and non-empty
+        9.  jtbd matches "When I .+, I want to .+, so I can .+\\."
     """
 
     # Build the set of cluster_ids we expect to see in the output.
@@ -378,6 +383,18 @@ def _validate_ost(ost: dict, clusters: list[dict]) -> None:
             raise _OSTValidationError(
                 f"Missing or empty jtbd_confidence_reason on cluster_id "
                 f"{opp.get('cluster_id')}. Must be a non-empty sentence."
+            )
+
+    # ── Check 9: JTBD format ──────────────────────────────────────────────────
+    # Every jtbd string must match the canonical template exactly:
+    # "When I [situation], I want to [motivation], so I can [outcome]."
+    # A mismatch means the model ignored Rule 1 in the system prompt.
+    for opp in opportunities:
+        jtbd = opp.get("jtbd", "")
+        if not _JTBD_RE.match(jtbd):
+            raise _OSTValidationError(
+                f"JTBD on cluster_id {opp.get('cluster_id')} does not match required "
+                f"format 'When I ..., I want to ..., so I can ...': {jtbd!r}"
             )
 
     # All checks passed — return normally (None).
