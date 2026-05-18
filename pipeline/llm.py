@@ -21,7 +21,7 @@ from groq import Groq, APIStatusError
 # ── Constants ─────────────────────────────────────────────────────────────────
 
 _PRIMARY_MODEL = "llama-3.3-70b-versatile"
-_FALLBACK_MODEL = "llama-3.1-8b-instant"
+_FALLBACK_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
 _MAX_TOKENS = 4096
 _SYSTEM_PROMPT_PATH = Path(__file__).parent.parent / "prompts" / "system_prompt.txt"
 
