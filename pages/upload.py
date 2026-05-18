@@ -2,7 +2,7 @@ import streamlit as st
 import pypdf
 from pipeline.extractor import extract_text as extract
 from pipeline.chunker import chunk_text as chunk
-from pipeline.embedder import embed_chunks as embed
+from pipeline.embedder import embed_chunks as embed, embed_text
 from pipeline.clusterer import cluster
 from pipeline.odi_scorer import score_clusters as score
 from pipeline.llm import build_ost
@@ -143,7 +143,8 @@ if st.session_state["pipeline_stage"] is None:
                         st.stop()
 
                     st.write("Scoring…")
-                    scored = score(clusters, all_chunks)
+                    goal_embedding = embed_text(goal) if goal else None
+                    scored = score(clusters, all_chunks, goal_embedding, embeddings)
                     st.session_state["scored_clusters"] = scored
                     st.write(f"✓ {len(clusters)} clusters · {len(all_chunks)} chunks scored")
 

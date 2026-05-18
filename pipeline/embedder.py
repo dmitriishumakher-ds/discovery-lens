@@ -24,6 +24,16 @@ def embed_chunks(chunks: list[dict]) -> np.ndarray: #Converts a list of text chu
     return np.array(embeddings) # Wrap in np.array() to guarantee the return type is always np.ndarray.
 
 
+def embed_text(text: str) -> np.ndarray:
+    """
+    Convert a single text string to a 384-dim embedding vector.
+    Used for embedding the validated goal so it can be compared against
+    cluster chunk embeddings for goal_relevance scoring (D-03).
+    """
+    model = _get_model()  # Reuse the singleton model — same instance as embed_chunks.
+    embedding = model.encode([text], show_progress_bar=False)  # encode() expects a list, wrap the single string.
+    return np.array(embedding[0])  # encode returns 2D (1, 384) — index [0] gives us 1D (384,) which is what goal_embedding expects.
+
 # ── Quick local test ──
 # This block only runs when you execute this file directly. It is never run when the app imports this module, so it won't slow anything down. that's already guaranteed by the if __name__ == "__main__": guard.
 # When you run python embedder.py directly in the terminal → __name__ equals "__main__" → the block runs. When Streamlit imports embedder.py as a module (from pipeline.embedder import embed_chunks) → __name__ equals "embedder" → the condition is false, the block is skipped entirely
