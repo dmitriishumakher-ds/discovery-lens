@@ -52,15 +52,37 @@ import numpy as np
 from transformers import pipeline as hf_pipeline
 from typing import Any
 
-# Initialise once at module level — avoids reloading model weights on every call
-# framework="tf" required on Apple Silicon (arm64) to avoid PyTorch bus error
-_sentiment = hf_pipeline(
-    "sentiment-analysis",
-    model="lxyuan/distilbert-base-multilingual-cased-sentiments-student",
-    framework="tf",
-    truncation=True,
-    max_length=512,
-)
+# Lazy-loaded sentiment model. @st.cache_resource keeps the loaded model in
+# memory across Streamlit reruns — without it, every user interaction would
+# reload the ~250MB lxyuan model from disk. Falls back to a plain singleton
+# when Streamlit isn't available (e.g. when this module is used from a notebook).
+# framework="tf" required on Apple Silicon (arm64) to avoid PyTorch bus error.
+try:
+    import streamlit as st
+    @st.cache_resource
+    def _get_sentiment_pipeline():
+        """Load the lxyuan sentiment-analysis pipeline once per Streamlit session."""
+        return hf_pipeline(
+            "sentiment-analysis",
+            model="lxyuan/distilbert-base-multilingual-cased-sentiments-student",
+            framework="tf",
+            truncation=True,
+            max_length=512,
+        )
+except ImportError:
+    _sentiment_singleton = None
+    def _get_sentiment_pipeline():
+        """Load the lxyuan sentiment-analysis pipeline once per Python process."""
+        global _sentiment_singleton
+        if _sentiment_singleton is None:
+            _sentiment_singleton = hf_pipeline(
+                "sentiment-analysis",
+                model="lxyuan/distilbert-base-multilingual-cased-sentiments-student",
+                framework="tf",
+                truncation=True,
+                max_length=512,
+            )
+        return _sentiment_singleton
 
 # ── Weights ────────────────────────────────────────────────────────────────────
 # Confirmed stable by T-16 sensitivity analysis (May 14 2026).
@@ -123,7 +145,7 @@ def _batch_sentiment(texts: list[str], batch_size: int = 8) -> list[float]:
     compounds = []
     for i in range(0, len(texts), batch_size):
         batch = texts[i:i + batch_size]
-        results = _sentiment(batch)
+        results = _get_sentiment_pipeline()(batch)
         compounds.extend(_score_to_compound(r) for r in results)
     return compounds
 
