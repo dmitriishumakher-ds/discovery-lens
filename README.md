@@ -156,7 +156,7 @@ Then open [http://localhost:8501](http://localhost:8501) in your browser.
 
 ## Team
 
-Built by [Lucas](https://github.com/Lookus22), [Mengda](https://github.com/XX2026),[Asma](https://github.com/asmajarrar2025-creator), and [Dmitrii](https://github.com/dmitriishumakher-ds) as part of the [Neue Fische / Spiced Academy](https://www.neuefische.de/en/bootcamp/data-science-and-ai) Data Science & AI bootcamp.
+Built by [Lucas](https://github.com/Lookus22), [Mengda](https://github.com/XX2026), [Asma](https://github.com/asmajarrar2025-creator), and [Dmitrii](https://github.com/dmitriishumakher-ds) as part of the [Neue Fische / Spiced Academy](https://www.neuefische.de/en/bootcamp/data-science-and-ai) Data Science & AI bootcamp.
 
 ---
 
