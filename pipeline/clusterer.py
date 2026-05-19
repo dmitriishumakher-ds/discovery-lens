@@ -38,14 +38,14 @@ RANDOM_STATE = 42
 MIN_CHUNKS_FOR_HDBSCAN = 50
 
 # UMAP — reduce 384 → 5 dims so HDBSCAN can find density regions
-UMAP_N_NEIGHBORS = 15
+UMAP_N_NEIGHBORS = 30 #changed from 15 due to 500 chunk cap resolved, larger neighbourhood → smoother UMAP manifold at scale 
 UMAP_N_COMPONENTS = 5
 UMAP_MIN_DIST = 0.0
 UMAP_METRIC = "cosine"
 
 # HDBSCAN — density-based clustering on the reduced space
-HDBSCAN_MIN_CLUSTER_SIZE = 15
-HDBSCAN_MIN_SAMPLES = 5
+HDBSCAN_MIN_CLUSTER_SIZE = 10 #smaller minimum cluster → more clusters formed (before 15)
+HDBSCAN_MIN_SAMPLES = 3 #less conservative → fewer points rejected as noise (before 5)
 HDBSCAN_METRIC = "euclidean"
 HDBSCAN_SELECTION = "eom"
 
@@ -123,6 +123,7 @@ def _cluster_hdbscan(chunks: list[dict], embeddings: np.ndarray) -> list[dict]:
 
     topics_arr = np.array(topics)
     unique_topics = sorted(set(int(t) for t in topics) - {-1})
+    print(f"[clusterer] HDBSCAN found {len(unique_topics)} clusters from {n_chunks} chunks.")
 
     # Degenerate case — HDBSCAN found nothing. Fall back to KMeans.
     if len(unique_topics) == 0:
@@ -203,8 +204,9 @@ def _cluster_kmeans_fallback(chunks: list[dict], embeddings: np.ndarray) -> list
     Output shape matches HDBSCAN path. Membership scores are synthesised from
     inverse normalised distance to centroid (range 0.0–1.0).
     """
-    n_chunks = len(chunks)
-    k_values = range(3, min(8, n_chunks + 1))
+    n_chunks = len(chunks) 
+    k_max = min(max(8, n_chunks // 80), 20)  # ~1 cluster per 80 chunks, floor 8, ceiling 20
+    k_values = range(3, min(k_max + 1, n_chunks + 1))
 
     best_k = 3
     best_score = -1.0

@@ -40,6 +40,8 @@ Replaced VADER May 13 2026 — benchmark in notebooks/sentiment_benchmark_lucas.
 
 
 Changelog:
+    May 19 2026 — _cluster_goal_relevance now uses membership-weighted mean
+                  (D-03 gap closed). T-09 membership_scores passed from clusterer.
     May 14 2026 — Added goal_relevance (D-03), multiplicative priority_score dampening,
                   and recommendation labels (D-02). 
     May 13 2026 — Replaced VADER with lxyuan (T-08). 
@@ -176,14 +178,15 @@ def _cluster_goal_relevance(
     chunk_ids: list[str],
     goal_embedding: np.ndarray,
     chunk_embedding_map: dict[str, np.ndarray],
+    membership_scores: dict[str, float] | None = None,
 ) -> float:
     """
-    Compute goal_relevance for a cluster as the mean cosine similarity
-    between the goal embedding and each chunk's embedding.
+    Compute goal_relevance as membership-weighted mean cosine similarity
+    between the goal embedding and each chunk's embedding in the cluster.
 
-    Uses a simple unweighted mean — membership-weighted mean will replace
-    this once T-09 (BERTopic + HDBSCAN) validates and membership scores
-    are available. See D-03 in docs/decisions.md.
+    Membership-weighted mean (D-03). T-09 merged May 14 — membership_scores
+    are now available and used here. Falls back to unweighted mean if
+    membership_scores is None or empty.
 
     Returns a value in range 0.0-1.0 (cosine similarity is clipped to 0
     for negative values, which indicate orthogonal/opposite direction).
@@ -193,18 +196,23 @@ def _cluster_goal_relevance(
         return 1.0
 
     sims = []
+    weights = []
     for cid in chunk_ids:
         emb = chunk_embedding_map.get(cid)
         if emb is not None:
-            sim = _cosine_similarity(goal_embedding, emb)
-            # Clip to 0 — negative cosine sim means opposing direction,
-            # which we treat as zero relevance rather than penalising further.
-            sims.append(max(sim, 0.0))
+            sim = max(_cosine_similarity(goal_embedding, emb), 0.0)
+            w = membership_scores.get(cid, 1.0) if membership_scores else 1.0
+            sims.append(sim)
+            weights.append(w)
 
     if not sims:
-        return 1.0  # no embeddings found — don't penalise
+        return 1.0
 
-    return float(np.mean(sims))
+    weights_arr = np.array(weights)
+    total = weights_arr.sum()
+    if total == 0:
+        return float(np.mean(sims))
+    return float(np.dot(sims, weights_arr) / total)
 
 
 # ── Recommendation label ──────────────────────────────────────────────────────
@@ -345,7 +353,10 @@ def score_clusters(
         # ------------------------------------------------------------------ #
 
         goal_relevance: float = _cluster_goal_relevance(
-            chunk_ids, goal_embedding, chunk_embedding_map
+            chunk_ids,
+            goal_embedding,
+            chunk_embedding_map,
+            membership_scores=cluster.get("membership_scores"),
         )
 
         # ------------------------------------------------------------------ #
