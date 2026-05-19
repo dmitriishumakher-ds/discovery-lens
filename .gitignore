@@ -11,6 +11,7 @@ build/
 Thumbs.db
 .streamlit/secrets.toml
 data/public/
+data/synthetic/ 
 data/synthetic/**/*.pdf
 data/synthetic/**/*.csv
 .cache/
