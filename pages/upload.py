@@ -40,7 +40,7 @@ if "pipeline_stage" not in st.session_state:
 if st.session_state["pipeline_stage"] is None:
 
     st.title("Upload your discovery data")
-    st.caption("Supported formats: PDF, TXT, CSV, DOCX · Max 500 chunks total for best performance")
+    st.caption("Supported formats: PDF, TXT, CSV, DOCX · Upload as many files as needed")
     st.divider()
 
     uploaded_files = st.file_uploader(
