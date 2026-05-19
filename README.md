@@ -80,7 +80,7 @@ Opportunities are also labelled automatically:
 |---|---|
 | App framework | Streamlit |
 | Deployment | Hugging Face Spaces (free tier: 2 vCPU, 16 GB RAM) |
-| LLM | Groq — `llama-3.3-70b-versatile` (fallback: `llama-3.1-8b-instant`) |
+| LLM | Groq — `llama-3.3-70b-versatile` (fallback: `llama-4-scout-17b-16e-instruct`) |
 | Embeddings | `sentence-transformers` — `all-MiniLM-L6-v2` (CPU-only, 384 dims) |
 | Clustering | BERTopic + HDBSCAN |
 | Sentiment | `lxyuan/distilbert-base-multilingual-cased-sentiments-student` |
