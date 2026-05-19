@@ -1,3 +1,14 @@
+---
+title: Discovery Lens
+emoji: 🔍
+colorFrom: indigo
+colorTo: purple
+sdk: streamlit
+sdk_version: "1.33.0"
+app_file: app.py
+pinned: false
+---
+
 # 🔍 Discovery Lens
 
 **Discovery Lens** is a Streamlit app for product managers that turns raw qualitative discovery data: user interviews, app reviews, support tickets, usability notes, into a structured, evidence-backed [Opportunity-Solution Tree (OST)](https://www.producttalk.org/2023/12/opportunity-solution-trees/).
