@@ -55,6 +55,10 @@ Rules:
    Each cluster includes a cluster_size field. Use it: cluster_size >= 15 is a prerequisite for high, not a guarantee.
    Default to medium when unsure. High should be rare — reserve it for cases where every JTBD part is explicitly stated verbatim in the evidence.
    Set jtbd_confidence_reason to exactly one sentence explaining your classification, referencing the evidence.
+10. Each cluster may include a "boundary_context" field containing one additional chunk with low membership probability.
+   This is supporting context only — it represents an outlier or edge case at the fringe of the cluster theme.
+   Use it to inform solutions or assumptions where relevant, but NEVER use it to anchor the situation clause of the JTBD.
+   The situation clause must come from the representative_chunks only. If boundary_context contradicts the main theme, ignore it.
 
 --- EXAMPLE 1 (B2B SaaS — project management) ---
 

@@ -84,9 +84,17 @@ def _load_system_prompt() -> str:
 
 def _build_user_message(clusters: list[dict], goal: str, context_block: str = "") -> str:
     """
-    T-10 hybrid chunk selection: each cluster contributes 3 chunks total —
-    the top 2 by HDBSCAN membership probability (cluster core, theme signal)
-    plus 1 boundary chunk (lowest membership, texture/outlier language).
+    T-10 hybrid chunk selection: each cluster sends 2 core chunks as primary
+    evidence plus 1 boundary chunk as supporting context only.
+
+    V-C finding (May 18 2026): including the boundary chunk in representative_chunks
+    caused the LLM to abstract the situation clause to generic language ("when I use
+    the product") rather than naming a concrete workflow. Specificity dropped from
+    4.1 → 2.7 on a 1–5 scale across 13 JTBD pairs.
+
+    Fix: boundary chunk is passed under a separate "boundary_context" key so the
+    LLM can reference it for texture and outlier signal without letting it anchor
+    the primary JTBD framing.
 
     cluster_size is passed so the model can calibrate jtbd_confidence per Rule 9.
     context_block is appended after cluster evidence if non-empty, omitted if empty.
@@ -97,8 +105,11 @@ def _build_user_message(clusters: list[dict], goal: str, context_block: str = ""
 
     slim_clusters: list[dict] = []
     for c in clusters:
+        # Primary evidence: top 2 by HDBSCAN membership (core theme signal)
         core_chunks = [_format_chunk(ch) for ch in c["representative_chunks"][:2]]
 
+        # Supporting context: boundary chunk (lowest membership — outlier/texture)
+        # Passed separately so it informs without anchoring the JTBD situation clause.
         boundary_list = c.get("boundary_chunks") or []
         if boundary_list:
             boundary_chunk = _format_chunk(boundary_list[0])
@@ -107,15 +118,15 @@ def _build_user_message(clusters: list[dict], goal: str, context_block: str = ""
         else:
             boundary_chunk = None
 
-        chunks_for_prompt = core_chunks + ([boundary_chunk] if boundary_chunk else [])
+        cluster_entry = {
+            "cluster_id": c["cluster_id"],
+            "cluster_size": len(c.get("all_chunk_ids", [])),
+            "representative_chunks": core_chunks,
+        }
+        if boundary_chunk:
+            cluster_entry["boundary_context"] = boundary_chunk
 
-        slim_clusters.append(
-            {
-                "cluster_id": c["cluster_id"],
-                "cluster_size": len(c.get("all_chunk_ids", [])),
-                "representative_chunks": chunks_for_prompt,
-            }
-        )
+        slim_clusters.append(cluster_entry)
 
     msg = f"Goal: {goal}\n\nClusters:\n{json.dumps(slim_clusters, indent=2)}"
     if context_block:
