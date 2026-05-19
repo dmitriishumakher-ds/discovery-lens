@@ -16,9 +16,12 @@ st.set_page_config(
 defaults = {
     "goal": "",
     "product_name": "",
+    "goal_validated": False,
+    "context_block": "",
     "chunks": [],
     "embeddings": None,
     "clusters": [],
+    "scored_clusters": [],
     "ost": {},
     "source_map": {},
 }
