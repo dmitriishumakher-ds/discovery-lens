@@ -25,4 +25,5 @@ data/synthetic/lidl_plus_app/
 data/synthetic/revolut/
 data/synthetic/notion_synthetic_dataset/
 data/synthetic/notion_synthetic_dataset.zip
+_archive/
 notebooks/jtbds_*.json

@@ -2,6 +2,8 @@
 Discovery Lens — Entry point
 Initialises session state keys and renders the home page.
 """
+from dotenv import load_dotenv
+load_dotenv()
 import streamlit as st
 
 st.set_page_config(
@@ -14,9 +16,12 @@ st.set_page_config(
 defaults = {
     "goal": "",
     "product_name": "",
+    "goal_validated": False,
+    "context_block": "",
     "chunks": [],
     "embeddings": None,
     "clusters": [],
+    "scored_clusters": [],
     "ost": {},
     "source_map": {},
 }

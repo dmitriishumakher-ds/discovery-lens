@@ -1,3 +1,6 @@
+import copy as _copy
+import csv as _csv
+import io as _io
 import json
 import streamlit as st
 import plotly.graph_objects as go
@@ -62,10 +65,14 @@ DEMO_SOURCE_MAP = {
 }
 
 # ── DATA ──────────────────────────────────────────────────────────────────────
-ost = st.session_state.get("ost") or DEMO_OST
+_had_real_ost = bool(st.session_state.get("ost"))
+is_demo = not _had_real_ost
+if not _had_real_ost:
+    st.session_state["ost"] = _copy.deepcopy(DEMO_OST)
+
+ost = st.session_state["ost"]
 source_map = st.session_state.get("source_map") or DEMO_SOURCE_MAP
 product_name = st.session_state.get("product_name", "")
-is_demo = not st.session_state.get("ost")
 
 goal_display = st.session_state.get("goal") or ost.get("goal", "")
 
@@ -427,3 +434,158 @@ with tab_heatmap:
             if not has_any:
                 st.caption("No evidence chunks linked yet.")
             st.markdown("---")
+
+
+# ── SIDEBAR: OST EDITOR + DOWNLOAD ───────────────────────────────────────────
+
+def _save_ost(updated: dict) -> None:
+    st.session_state["ost"] = updated
+
+
+def _build_csv(opps: list) -> str:
+    buf = _io.StringIO()
+    w = _csv.writer(buf)
+    w.writerow([
+        "rank", "jtbd", "priority_score", "odi_score", "evidence_robustness",
+        "importance", "satisfaction", "job_type", "jtbd_confidence", "solutions",
+    ])
+    for i, o in enumerate(opps):
+        w.writerow([
+            i + 1,
+            o.get("jtbd", ""),
+            o.get("priority_score", ""),
+            o.get("odi_score", ""),
+            o.get("evidence_robustness", ""),
+            o.get("importance", ""),
+            o.get("satisfaction", ""),
+            o.get("job_type", ""),
+            o.get("jtbd_confidence", ""),
+            " | ".join(s.get("label", "") for s in o.get("solutions", [])),
+        ])
+    return buf.getvalue()
+
+
+with st.sidebar:
+    st.markdown("## OST Editor")
+
+    # ── Edit goal ─────────────────────────────────────────────────────────────
+    st.markdown("#### Goal")
+    edited_goal = st.text_area(
+        "Goal statement", value=ost.get("goal", ""),
+        key="_sb_goal", label_visibility="collapsed", height=90,
+    )
+    if st.button("Save goal", key="_sb_save_goal", use_container_width=True):
+        ost["goal"] = edited_goal.strip()
+        st.session_state["goal"] = edited_goal.strip()
+        _save_ost(ost)
+        st.rerun()
+
+    st.divider()
+
+    # ── Edit / delete opportunity ─────────────────────────────────────────────
+    if opportunities:
+        st.markdown("#### Edit opportunity")
+        opp_labels = [f"#{i + 1} — {o['jtbd'][:38]}…" for i, o in enumerate(opportunities)]
+        edit_idx = st.selectbox(
+            "Select opportunity", range(len(opportunities)),
+            format_func=lambda i: opp_labels[i],
+            key="_sb_sel_opp", label_visibility="collapsed",
+        )
+        opp = opportunities[edit_idx]
+
+        edited_jtbd = st.text_area(
+            "JTBD statement", value=opp.get("jtbd", ""),
+            key=f"_sb_jtbd_{edit_idx}", height=110,
+            label_visibility="collapsed",
+        )
+
+        st.caption("Solutions")
+        for i, sol in enumerate(list(opp.get("solutions", []))):
+            c1, c2 = st.columns([5, 1])
+            with c1:
+                st.text_input(
+                    f"sol_{i}", value=sol["label"],
+                    key=f"_sb_sol_{edit_idx}_{i}", label_visibility="collapsed",
+                )
+            with c2:
+                if st.button("✕", key=f"_sb_del_sol_{edit_idx}_{i}", help="Remove solution"):
+                    opp["solutions"].pop(i)
+                    _save_ost(ost)
+                    st.rerun()
+
+        new_sol = st.text_input(
+            "New solution", key=f"_sb_new_sol_{edit_idx}",
+            placeholder="Solution label…", label_visibility="collapsed",
+        )
+        if st.button("+ Add solution", key=f"_sb_add_sol_{edit_idx}", use_container_width=True):
+            if new_sol.strip():
+                opp.setdefault("solutions", []).append(
+                    {"label": new_sol.strip(), "assumptions": []}
+                )
+                _save_ost(ost)
+                st.rerun()
+
+        c_save, c_del = st.columns(2)
+        with c_save:
+            if st.button("Save", key=f"_sb_save_opp_{edit_idx}",
+                         type="primary", use_container_width=True):
+                opp["jtbd"] = edited_jtbd.strip()
+                for i, sol in enumerate(opp.get("solutions", [])):
+                    val = st.session_state.get(f"_sb_sol_{edit_idx}_{i}")
+                    if val is not None:
+                        sol["label"] = val
+                _save_ost(ost)
+                st.rerun()
+        with c_del:
+            if st.button("Delete", key=f"_sb_del_opp_{edit_idx}", use_container_width=True):
+                ost["opportunities"] = [
+                    o for o in ost.get("opportunities", []) if o is not opp
+                ]
+                _save_ost(ost)
+                st.rerun()
+
+    st.divider()
+
+    # ── Add new opportunity ───────────────────────────────────────────────────
+    st.markdown("#### Add opportunity")
+    new_opp_jtbd = st.text_area(
+        "New JTBD", key="_sb_new_opp_jtbd",
+        placeholder="When I …, I want to …, so I can …",
+        height=80, label_visibility="collapsed",
+    )
+    if st.button("+ Add opportunity", key="_sb_add_opp", use_container_width=True):
+        if new_opp_jtbd.strip():
+            max_cid = max(
+                (o.get("cluster_id", -1) for o in ost.get("opportunities", [])),
+                default=-1,
+            )
+            ost.setdefault("opportunities", []).append({
+                "jtbd": new_opp_jtbd.strip(),
+                "cluster_id": max_cid + 1,
+                "importance": 0.0, "satisfaction": 0.5, "source_type_diversity": 0.0,
+                "odi_score": 0.0, "evidence_robustness": 0.0, "priority_score": 0.0,
+                "job_type": "functional", "jtbd_confidence": "low",
+                "jtbd_confidence_reason": "Manually added.",
+                "solutions": [],
+            })
+            _save_ost(ost)
+            st.rerun()
+
+    st.divider()
+
+    # ── Download ──────────────────────────────────────────────────────────────
+    st.markdown("#### Download OST")
+    st.download_button(
+        "Download JSON ↓",
+        data=json.dumps(ost, indent=2),
+        file_name="discovery_lens_ost.json",
+        mime="application/json",
+        use_container_width=True,
+    )
+    st.download_button(
+        "Download CSV ↓",
+        data=_build_csv(opportunities),
+        file_name="discovery_lens_ost.csv",
+        mime="text/csv",
+        use_container_width=True,
+    )
