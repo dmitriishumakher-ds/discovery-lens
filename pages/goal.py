@@ -137,12 +137,3 @@ if val is not None and not val["passed"]:
             st.session_state["_val_result"] = None
             st.session_state["current_screen"] = 2
             st.switch_page("pages/upload.py")
-
-# ── DEBUG ──────────────────────────────────────────────────────────────────────
-with st.expander("🔍 Debug: session state (delete before demo)"):
-    st.json({
-        "product_name": st.session_state["product_name"],
-        "goal": st.session_state["goal"],
-        "goal_validated": st.session_state["goal_validated"],
-        "current_screen": st.session_state["current_screen"],
-    })

@@ -114,7 +114,7 @@ def _extract_csv(file: "UploadedFile") -> str:
     df = pd.read_csv(file)
 
     # Keep only object (string) columns — numeric columns like ratings add noise
-    text_cols = df.select_dtypes(include="object").columns.tolist()
+    text_cols = df.select_dtypes(include="str").columns.tolist()
 
     if not text_cols:
         return ""
