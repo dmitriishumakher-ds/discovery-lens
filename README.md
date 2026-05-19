@@ -1,10 +1,11 @@
 ---
 title: Discovery Lens
 emoji: 🔍
-colorFrom: blue
-colorTo: green
-sdk: docker
-app_port: 8501
+colorFrom: indigo
+colorTo: purple
+sdk: streamlit
+sdk_version: "1.32.0"
+app_file: app.py
 pinned: false
 ---
 
