@@ -123,7 +123,7 @@ def _cluster_hdbscan(chunks: list[dict], embeddings: np.ndarray) -> list[dict]:
 
     topics_arr = np.array(topics)
     unique_topics = sorted(set(int(t) for t in topics) - {-1})
-    print(f"[clusterer] HDBSCAN found {len(unique_topics)} clusters from {n_chunks} chunks.")
+    print(f"[clusterer] HDBSCAN found {len(unique_topics)} clusters from {len(chunks)} chunks.")
 
     # Degenerate case — HDBSCAN found nothing. Fall back to KMeans.
     if len(unique_topics) == 0:
