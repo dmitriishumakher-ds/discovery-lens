@@ -21,7 +21,7 @@ You set a product goal, upload your discovery files, and the tool clusters insig
 
 ## Live demo
 
-🚀 **[Try it on Hugging Face Spaces](https://huggingface.co/spaces/YOUR_SPACE_URL)** ← _update after deployment_
+🚀 **[Try it on Hugging Face Spaces](https://huggingface.co/spaces/DiscoveryLens/discovery-lens)** 
 
 ---
 
