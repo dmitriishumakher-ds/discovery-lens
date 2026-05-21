@@ -38,14 +38,14 @@ RANDOM_STATE = 42
 MIN_CHUNKS_FOR_HDBSCAN = 50
 
 # UMAP — reduce 384 → 5 dims so HDBSCAN can find density regions
-UMAP_N_NEIGHBORS = 30 #changed from 15 due to 500 chunk cap resolved, larger neighbourhood → smoother UMAP manifold at scale 
+UMAP_N_NEIGHBORS = 15 #(changed from 15 due to 500 chunk cap resolved, larger neighbourhood → smoother UMAP manifold at scale) -> changed to 15 again
 UMAP_N_COMPONENTS = 5
 UMAP_MIN_DIST = 0.0
 UMAP_METRIC = "cosine"
 
 # HDBSCAN — density-based clustering on the reduced space
-HDBSCAN_MIN_CLUSTER_SIZE = 10 #smaller minimum cluster → more clusters formed (before 15)
-HDBSCAN_MIN_SAMPLES = 3 #less conservative → fewer points rejected as noise (before 5)
+HDBSCAN_MIN_CLUSTER_SIZE = 7 #(smaller minimum cluster → more clusters formed (before 15)) --> changed from 10 to 7
+HDBSCAN_MIN_SAMPLES = 3 #less conservative → fewer points rejected as noise (before 5) --> changed from 5 to 3
 HDBSCAN_METRIC = "euclidean"
 HDBSCAN_SELECTION = "eom"
 
